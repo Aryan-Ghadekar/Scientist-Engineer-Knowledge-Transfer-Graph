@@ -1,30 +1,19 @@
+</p>
+
+<h1 align="center">Scientist-Engineer-Knowledge-Transfer-Graph</h1>
+
 <p align="center">
+  <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white"/></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black"/></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white"/></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white"/></a>
+  <a href="https://openjdk.org/"><img src="https://img.shields.io/badge/Java-17+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white"/></a>
+  <a href="https://maven.apache.org/"><img src="https://img.shields.io/badge/Maven-3.x-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white"/></a>
+</p>
 
-<br/>
-
-```
-╔══════════════════════════════════════════════════════════════╗
-║           🔬 SCIENTIST ──── KNOWLEDGE ──── ENGINEER 🔧      ║
-╚══════════════════════════════════════════════════════════════╝
-Scientist-Engineer-Knowledge-Transfer-Graph
-```
-
-<br/>
-
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Java](https://img.shields.io/badge/Java-17+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
-[![Maven](https://img.shields.io/badge/Maven-3.x-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)](https://maven.apache.org/)
-
-<br/>
-
-> **Visualize how scientific theories travel through time into engineering reality.**  
-> Track knowledge transfer, detect innovation bottlenecks, and map the lag between discovery and implementation — through interactive bipartite graphs.
-
-<br/>
-
+<p align="center">
+  <b>Visualize how scientific theories travel through time into engineering reality.</b><br/>
+  Track knowledge transfer, detect innovation bottlenecks, and map the lag between discovery and implementation — through interactive bipartite graphs.
 </p>
 
 ---

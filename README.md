@@ -1,4 +1,4 @@
-<div align="center">
+<p align="center">
 
 <br/>
 
@@ -25,7 +25,7 @@ Scientist-Engineer-Knowledge-Transfer-Graph
 
 <br/>
 
-</div>
+</p>
 
 ---
 

@@ -1,0 +1,27 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Explicitly declare text files
+*.java text
+*.kt text
+*.xml text
+*.json text
+*.ts text
+*.tsx text
+*.js text
+*.css text
+*.scss text
+*.html text
+*.md text
+*.yml text
+*.properties text
+
+# Binary files (never modify line endings)
+*.png binary
+*.jpg binary
+*.ico binary
+*.gif binary
+*.jar binary
+*.exe binary
+*.woff binary
+*.woff2 binary

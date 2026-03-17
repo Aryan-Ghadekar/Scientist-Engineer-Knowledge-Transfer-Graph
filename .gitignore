@@ -1,0 +1,43 @@
+# =========================
+# Spring Boot / Java
+# =========================
+/target/                  # Maven build output
+/build/                   # Gradle build output
+*.class                   # Compiled class files
+
+# IntelliJ / Eclipse
+/.idea/
+/*.iml
+/.classpath
+/.project
+/.settings/
+
+# Logs
+*.log
+
+# ==============
+# React / Vite
+# ==============
+node_modules/             # Dependencies
+dist/                     # Vite production build output
+.env                      # Environment variables
+.vite/                     # Vite cache folder
+*.local                   # local config files
+
+# npm / yarn / pnpm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Common / OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+*.bak
+*~
+.vscode/
+.vscode/

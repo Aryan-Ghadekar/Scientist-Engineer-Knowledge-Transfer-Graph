@@ -1,3 +1,33 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+}
+
+body {
+  background-color: #0e131f;
+  color: #dde2f3;
+  font-family: "Inter", sans-serif;
+}
+
+.node-connector {
+  background: linear-gradient(90deg, #adc6ff 0%, #bdc2ff 50%, #4ae176 100%);
+}
+
+.glass-panel {
+  background: rgba(14, 19, 31, 0.7);
+  backdrop-filter: blur(12px);
+}
+
+.ghost-border {
+  border: 1px solid rgba(173, 198, 255, 0.15);
+}
+
+.tonal-shift {
+  background-color: rgba(14, 19, 31, 0.8);
+}

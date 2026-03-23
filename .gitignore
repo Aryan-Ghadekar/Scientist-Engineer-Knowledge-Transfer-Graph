@@ -41,3 +41,8 @@ Thumbs.db
 *~
 .vscode/
 .vscode/
+
+# =========================
+# client
+# =========================
+client/node_modules

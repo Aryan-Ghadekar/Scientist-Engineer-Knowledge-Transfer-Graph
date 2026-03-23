@@ -1,113 +1,332 @@
-import React from 'react';
-import { FaClock, FaTable } from 'react-icons/fa';
-import LagTable, { LagData } from '../components/LagTable';
-import StatCard from '../components/StatCard';
+import { Activity, ChevronLeft, ChevronRight, Clock, Download, Lightbulb, ListFilter, LucideIcon, Network, Search, TrendingUp, Zap } from "lucide-react";
+import React, { useState } from "react";
 
-const lagData: LagData[] = [
-  {
-    discovery: 'Quantum Mechanics',
-    discoveryYear: 1925,
-    implementation: 'Quantum Computing',
-    implementationYear: 1998,
-    lag: 73,
-  },
-  {
-    discovery: 'Neural Networks',
-    discoveryYear: 1943,
-    implementation: 'Deep Learning Systems',
-    implementationYear: 1986,
-    lag: 43,
-  },
-  {
-    discovery: 'Transformer Architecture',
-    discoveryYear: 2017,
-    implementation: 'GPT Models',
-    implementationYear: 2020,
-    lag: 3,
-  },
-  {
-    discovery: 'Turing Machine',
-    discoveryYear: 1936,
-    implementation: 'Modern Computers',
-    implementationYear: 1978,
-    lag: 42,
-  },
-  {
-    discovery: 'Information Theory',
-    discoveryYear: 1948,
-    implementation: 'Digital Communications',
-    implementationYear: 1960,
-    lag: 12,
-  },
-  {
-    discovery: 'Cellular Automata',
-    discoveryYear: 1948,
-    implementation: 'Artificial Life Simulations',
-    implementationYear: 1970,
-    lag: 22,
-  },
-  {
-    discovery: 'Bayesian Inference',
-    discoveryYear: 1763,
-    implementation: 'Modern Machine Learning',
-    implementationYear: 1990,
-    lag: 227,
-  },
-  {
-    discovery: 'Graph Theory',
-    discoveryYear: 1736,
-    implementation: 'Social Network Analysis',
-    implementationYear: 2004,
-    lag: 268,
-  },
-];
+interface StatCardProps {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  unit: string;
+  valueColor: string;
+}
+
+const StatCard: React.FC<StatCardProps> = ({
+  icon: Icon,
+  label,
+  value,
+  unit,
+  valueColor,
+}) => (
+  <div className="bg-surface-container-high p-6 rounded-2xl ghost-border relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-4 opacity-10">
+      <Icon />
+    </div>
+    <p className="text-xs text-on-surface-variant uppercase tracking-widest font-bold mb-2">
+      {label}
+    </p>
+    <div className="flex items-baseline space-x-2">
+      <span className={`text-4xl font-headline font-bold ${valueColor}`}>
+        {value}
+      </span>
+      <span className="text-on-surface-variant font-label text-sm">{unit}</span>
+    </div>
+  </div>
+);
+
+interface LagRowProps {
+  discovery: string;
+  discoveryYear: number;
+  implementation: string;
+  implementationYear: number;
+  lag: string;
+  lagColor: string;
+  lagBg: string;
+  lagBorder: string;
+  pulse?: boolean;
+}
+
+const LagRow: React.FC<LagRowProps> = ({
+  discovery,
+  discoveryYear,
+  implementation,
+  implementationYear,
+  lag,
+  lagColor,
+  lagBg,
+  lagBorder,
+  pulse = false,
+}) => (
+  <tr className="hover:bg-primary/5 transition-colors group">
+    <td className="px-8 py-6">
+      <div className="flex items-center space-x-3">
+        <div
+          className={`w-2 h-2 rounded-full bg-primary${pulse ? " animate-pulse" : "/40"}`}
+        />
+        <span className="font-headline font-semibold text-on-surface">
+          {discovery}
+        </span>
+      </div>
+    </td>
+    <td className="px-8 py-6 text-center font-label text-on-surface-variant">
+      {discoveryYear}
+    </td>
+    <td className="px-8 py-6 font-headline text-on-surface">{implementation}</td>
+    <td className="px-8 py-6 text-center font-label text-on-surface-variant">
+      {implementationYear}
+    </td>
+    <td className="px-8 py-6 text-right">
+      <span
+        className={`inline-flex items-center ${lagBg} ${lagColor} px-3 py-1 rounded-full text-xs font-bold border ${lagBorder}`}
+      >
+        {lag}
+      </span>
+    </td>
+  </tr>
+);
 
 const LagAnalysisPage: React.FC = () => {
-  const avgLag = Math.round(lagData.reduce((sum, item) => sum + item.lag, 0) / lagData.length);
-  const maxLag = Math.max(...lagData.map((item) => item.lag));
-  const minLag = Math.min(...lagData.map((item) => item.lag));
+  const [search, setSearch] = useState("");
+
+  const rows: LagRowProps[] = [
+    {
+      discovery: "Quantum Mechanics",
+      discoveryYear: 1925,
+      implementation: "Quantum Computing R&D",
+      implementationYear: 1998,
+      lag: "73 yrs",
+      lagColor: "text-error",
+      lagBg: "bg-error-container/20",
+      lagBorder: "border-error/20",
+      pulse: true,
+    },
+    {
+      discovery: "Neural Networks",
+      discoveryYear: 1943,
+      implementation: "Commercial AI Scale",
+      implementationYear: 1986,
+      lag: "43 yrs",
+      lagColor: "text-tertiary",
+      lagBg: "bg-tertiary-container/20",
+      lagBorder: "border-tertiary/20",
+    },
+    {
+      discovery: "Transformer Theory",
+      discoveryYear: 2017,
+      implementation: "GPT-3 Deployment",
+      implementationYear: 2020,
+      lag: "3 yrs",
+      lagColor: "text-secondary",
+      lagBg: "bg-secondary-container/20",
+      lagBorder: "border-secondary/20",
+    },
+    {
+      discovery: "Semiconductor Physics",
+      discoveryYear: 1931,
+      implementation: "First Transistor",
+      implementationYear: 1947,
+      lag: "16 yrs",
+      lagColor: "text-tertiary",
+      lagBg: "bg-tertiary-container/20",
+      lagBorder: "border-tertiary/20",
+    },
+  ];
+
+  const filtered = rows.filter((r) =>
+    r.discovery.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gray-950">
-      <div className="max-w-7xl mx-auto px-4 py-12">
-        <div className="mb-8">
-          <h1 className="text-indigo-400 text-4xl font-bold mb-4">
+    <main className="lg:pl-64 pt-24 pb-12 px-8 lg:px-20 min-h-screen">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <header className="mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary-container tracking-tight mb-2">
             Theory → Implementation Lag Analysis
           </h1>
-          <p className="text-gray-300 text-lg">
-            Analyzing the temporal gap between theoretical discoveries and practical engineering
-            implementations across various domains.
+          <p className="text-on-surface-variant font-body max-w-2xl opacity-80">
+            Measuring the temporal gap between theoretical discovery and
+            practical engineering implementation across scientific epochs.
           </p>
-        </div>
+        </header>
 
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <StatCard icon={FaClock} label="Average Lag" value={`${avgLag} yrs`} />
-          <StatCard icon={FaClock} label="Maximum Lag" value={`${maxLag} yrs`} />
-          <StatCard icon={FaClock} label="Minimum Lag" value={`${minLag} yrs`} />
-          <StatCard icon={FaTable} label="Total Pairs" value={lagData.length} />
-        </div>
+        {/* Stat Cards */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <StatCard
+            icon={Clock}
+            label="Avg Lag"
+            value="28.5"
+            unit="yrs"
+            valueColor="text-primary"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Max Lag"
+            value="73"
+            unit="yrs"
+            valueColor="text-error"
+          />
+          <StatCard
+            icon={Zap}
+            label="Min Lag"
+            value="3"
+            unit="yrs"
+            valueColor="text-secondary"
+          />
+          <StatCard
+            icon={Network}
+            label="Total Pairs"
+            value="42"
+            unit="nodes"
+            valueColor="text-tertiary"
+          />
+        </section>
 
-        <LagTable data={lagData} />
+        {/* Table Section */}
+        <section className="bg-surface-container rounded-2xl overflow-hidden ghost-border">
+          {/* Search & Filters */}
+          <div className="p-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-surface-container-low/50">
+            <div className="relative w-full md:w-96">
+              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline-variant">
+                <Search className="w-4 h-4" />
+              </span>
+              <input
+                className="w-full bg-surface-container-highest border-none rounded-xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-primary/50 text-on-surface placeholder:text-outline-variant font-body text-sm transition-all outline-none"
+                placeholder="Search discoveries..."
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center space-x-3 w-full md:w-auto">
+              <button className="flex-1 md:flex-none flex items-center justify-center space-x-2 bg-surface-container-highest px-4 py-3 rounded-xl hover:bg-surface-bright transition-colors text-sm font-medium">
+                <ListFilter className="w-4 h-4" />
+                <span>Filter</span>
+              </button>
+              <button className="flex-1 md:flex-none flex items-center justify-center space-x-2 bg-surface-container-highest px-4 py-3 rounded-xl hover:bg-surface-bright transition-colors text-sm font-medium">
+                <Download className="w-4 h-4" />
+                <span>Export Data</span>
+              </button>
+            </div>
+          </div>
 
-        <div className="mt-8 bg-gray-900 border border-gray-700 rounded-2xl shadow-lg p-6">
-          <h3 className="text-indigo-400 text-xl font-bold mb-4">Key Insights</h3>
-          <ul className="space-y-3 text-gray-300">
-            <li className="flex items-start gap-2">
-              <span className="text-green-400">•</span>
-              <span>Modern AI research shows dramatically reduced lag times (3 years for Transformers)</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-yellow-400">•</span>
-              <span>Classical theories like Quantum Mechanics took 73 years to reach practical implementation</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-red-400">•</span>
-              <span>Mathematical foundations can take centuries to find practical applications</span>
-            </li>
-          </ul>
-        </div>
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-surface-container-low text-left">
+                  <th className="px-8 py-5 text-xs text-outline-variant font-bold uppercase tracking-wider">
+                    Discovery
+                  </th>
+                  <th className="px-8 py-5 text-xs text-outline-variant font-bold uppercase tracking-wider text-center">
+                    Year
+                  </th>
+                  <th className="px-8 py-5 text-xs text-outline-variant font-bold uppercase tracking-wider">
+                    Implementation
+                  </th>
+                  <th className="px-8 py-5 text-xs text-outline-variant font-bold uppercase tracking-wider text-center">
+                    Year
+                  </th>
+                  <th className="px-8 py-5 text-xs text-outline-variant font-bold uppercase tracking-wider text-right">
+                    Lag (years)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {filtered.map((row, i) => (
+                  <LagRow key={i} {...row} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="px-8 py-4 bg-surface-container-low/50 flex justify-between items-center">
+            <p className="text-xs text-outline-variant font-label">
+              Showing {filtered.length} of 42 theory-to-implementation records
+            </p>
+            <div className="flex space-x-2">
+              <button
+                className="p-2 hover:bg-surface-bright rounded-lg disabled:opacity-30"
+                disabled
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button className="p-2 hover:bg-surface-bright rounded-lg">
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Visual Insight */}
+        <section className="mt-12 grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Bar Chart */}
+          <div className="lg:col-span-8 bg-surface-container-high rounded-2xl p-8 ghost-border relative overflow-hidden">
+            <h3 className="font-headline text-xl font-bold mb-6 flex items-center space-x-2">
+              <Activity className="w-5 h-5 text-primary" />
+              <span>Global Lag Trend Over Time</span>
+            </h3>
+            <div className="h-64 flex items-end justify-between space-x-2 px-4">
+              {[
+                { h: "90%", color: "bg-error-container/30", tooltip: "1920s: 70y avg" },
+                { h: "85%", color: "bg-error-container/30" },
+                { h: "60%", color: "bg-tertiary-container/30" },
+                { h: "55%", color: "bg-tertiary-container/30" },
+                { h: "45%", color: "bg-tertiary-container/30" },
+                { h: "25%", color: "bg-secondary-container/30", tooltip: "2020s: 4y avg" },
+              ].map((bar, i) => (
+                <div
+                  key={i}
+                  className={`w-full ${bar.color} rounded-t-lg relative group`}
+                  style={{ height: bar.h }}
+                >
+                  {bar.tooltip && (
+                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-surface-container-highest px-2 py-1 rounded text-[10px] whitespace-nowrap">
+                      {bar.tooltip}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between mt-4 text-[10px] uppercase font-bold tracking-tighter text-outline-variant">
+              {["1920", "1940", "1960", "1980", "2000", "Present"].map((yr) => (
+                <span key={yr}>{yr}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Insight Cards */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-surface-container-highest p-6 rounded-2xl ghost-border">
+              <h4 className="font-headline font-bold text-lg mb-2">
+                Key Bottleneck
+              </h4>
+              <p className="text-sm text-on-surface-variant font-body mb-4 leading-relaxed">
+                Most delays originate from{" "}
+                <span className="text-error font-bold italic">
+                  Manufacturing Precision
+                </span>{" "}
+                constraints rather than theoretical gaps.
+              </p>
+              <button className="w-full bg-surface-bright py-3 rounded-xl text-xs font-bold uppercase tracking-widest hover:text-primary transition-colors border border-outline-variant/10">
+                View Detailed Report
+              </button>
+            </div>
+            <div className="bg-gradient-to-br from-primary-container/20 to-transparent p-6 rounded-2xl ghost-border border-primary-container/20">
+              <div className="flex items-center space-x-2 mb-2">
+                <Lightbulb className="w-5 h-5 text-secondary fill-secondary" />
+                <span className="font-headline font-bold text-on-surface">
+                  Insight
+                </span>
+              </div>
+              <p className="text-xs text-on-surface-variant font-body italic leading-relaxed">
+                "The compression of lag time is accelerating exponentially due
+                to digital simulation fidelity."
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 };
 

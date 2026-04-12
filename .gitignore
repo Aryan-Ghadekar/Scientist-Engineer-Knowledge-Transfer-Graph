@@ -46,3 +46,11 @@ Thumbs.db
 # client
 # =========================
 client/node_modules
+
+
+# =========================
+# python server
+# =========================
+fastapi-server/.venv
+fastapi-server/__pycache__
+fastapi-server/*.pyc

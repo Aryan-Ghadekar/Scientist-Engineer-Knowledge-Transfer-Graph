@@ -1,4 +1,4 @@
-import { ArrowDown, BarChart2, FlaskConical, Plus } from "lucide-react";
+import { ArrowDown, BarChart2, FlaskConical, Plus, Rocket } from "lucide-react";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -36,7 +36,7 @@ const HomePage: React.FC = () => {
               className="bg-gradient-to-br from-primary to-primary-container text-on-primary-fixed px-8 py-4 rounded-xl font-bold transition-transform active:scale-95 flex items-center gap-2"
             >
               Initialize Graph{" "}
-              <span className="material-symbols-outlined">rocket_launch</span>
+              <Rocket className="w-5 h-5 text-on-primary-fixed" />
             </button>
             <button className="bg-surface-container-high border border-primary/15 text-primary px-8 py-4 rounded-xl font-bold transition-all hover:bg-primary/5 active:scale-95">
               Documentation

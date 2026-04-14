@@ -54,3 +54,7 @@ client/node_modules
 fastapi-server/.venv
 fastapi-server/__pycache__
 fastapi-server/*.pyc
+fastapi-server/config/__pycache__
+fastapi-server/routes/__pycache__
+fastapi-server/services/__pycache__
+fastapi-server/.env

@@ -1,218 +1,550 @@
-import { ArrowRight, HardHat, Rocket, User } from "lucide-react";
-import React from "react";
+/**
+ * GraphPage.tsx
+ *
+ * Main page for the Paper ↔ Patent bipartite knowledge graph.
+ *
+ * Responsibilities:
+ *   • Fetch graph data from the backend on mount (with loading / error states)
+ *   • Own all selection state (selected node, selected edge, filters)
+ *   • Search bar — filters visible nodes + edges by paper/patent title or id
+ *   • Compose the 3-D canvas + HUD panels
+ */
 
-interface ScientistNodeProps {
-  name: string;
-  title: string;
-  tags: string[];
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
+
+import BipartiteGraph3D from "../components/Bipartitegraph3d";
+import NodeInfoPanel    from "../components/Nodeinfopanel";
+import EdgeInfoPanel    from "../components/Edgeinfopanel";
+import { StatsBar, Legend, ClickHint } from "../components/GraphHUD";
+
+import {
+  GraphData,
+  GraphNode,
+  SelectedEdgeState,
+} from "../components/types/graph.types";
+
+
+// ── API ───────────────────────────────────────────────────────────────────────
+
+const API_BASE = "http://localhost:8000";
+
+async function fetchGraphData(limit: number, minSim: number): Promise<GraphData> {
+  const url = `${API_BASE}/api/graph/bipartite?limit=${limit}&min_similarity=${minSim}`;
+  const res  = await fetch(url);
+  if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
+  return res.json() as Promise<GraphData>;
 }
 
-const ScientistNode: React.FC<ScientistNodeProps> = ({ name, title, tags }) => (
-  <div className="group relative bg-surface-container-low border border-primary/20 p-6 rounded-xl hover:bg-surface-container-high transition-all duration-300">
-    <div className="flex items-center gap-4 mb-4">
-      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-         <User className="w-6 h-6 text-primary fill-primary" />
-      </div>
-      <div>
-        <h3 className="font-headline font-bold text-xl text-primary">{name}</h3>
-        <p className="text-xs text-on-surface-variant font-label">{title}</p>
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-2">
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          className="text-[10px] px-2 py-1 bg-primary/5 text-primary border border-primary/10 rounded-full font-label"
-        >
-          {tag}
-        </span>
-      ))}
-    </div>
-  </div>
-);
 
-interface EngineerNodeProps {
-  name: string;
-  title: string;
-  tags: string[];
+// ── Search filtering ──────────────────────────────────────────────────────────
+
+/**
+ * Given a raw GraphData and a search string, returns a filtered GraphData
+ * containing only nodes whose title or id matches, plus all edges that
+ * connect at least one matched node (so you always see the full neighbourhood).
+ *
+ * Empty query → returns the full dataset unchanged.
+ */
+function filterGraphBySearch(data: GraphData, query: string): GraphData {
+  const q = query.trim().toLowerCase();
+  if (!q) return data;
+
+  // 1. Which papers / patents directly match the query?
+  const matchedPaperIds = new Set(
+    data.papers
+      .filter(p => p.title.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
+      .map(p => p.id)
+  );
+  const matchedPatentIds = new Set(
+    data.patents
+      .filter(p => p.title.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
+      .map(p => p.id)
+  );
+
+  // 2. Edges that touch at least one matched node
+  const relevantEdges = data.edges.filter(
+    e => matchedPaperIds.has(e.source) || matchedPatentIds.has(e.target)
+  );
+
+  // 3. Pull in the other endpoint of each relevant edge (shows the connections)
+  const visiblePaperIds  = new Set(matchedPaperIds);
+  const visiblePatentIds = new Set(matchedPatentIds);
+  relevantEdges.forEach(e => {
+    visiblePaperIds.add(e.source);
+    visiblePatentIds.add(e.target);
+  });
+
+  const filteredPapers  = data.papers.filter(p => visiblePaperIds.has(p.id));
+  const filteredPatents = data.patents.filter(p => visiblePatentIds.has(p.id));
+
+  return {
+    ...data,
+    papers:        filteredPapers,
+    patents:       filteredPatents,
+    edges:         relevantEdges,
+    total_papers:  filteredPapers.length,
+    total_patents: filteredPatents.length,
+    total_edges:   relevantEdges.length,
+  };
 }
 
-const EngineerNode: React.FC<EngineerNodeProps> = ({ name, title, tags }) => (
-  <div className="group relative bg-surface-container-low border border-secondary/20 p-6 rounded-xl hover:bg-surface-container-high transition-all duration-300">
-    <div className="flex items-center justify-end gap-4 mb-4">
-      <div className="text-right">
-        <h3 className="font-headline font-bold text-xl text-secondary">{name}</h3>
-        <p className="text-xs text-on-surface-variant font-label">{title}</p>
-      </div>
-      <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center border border-secondary/20">
-        <HardHat className="w-6 h-6 text-secondary" />
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-2 justify-end">
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          className="text-[10px] px-2 py-1 bg-secondary/5 text-secondary border border-secondary/10 rounded-full font-label"
-        >
-          {tag}
-        </span>
-      ))}
-    </div>
-  </div>
-);
 
-interface EdgeProps {
-  topOffset: number;
-  lag: string;
+// ── Suggestion dropdown item ──────────────────────────────────────────────────
+
+interface SuggestionItemProps {
+  label:  string;
+  sub:    string;
+  type:   "paper" | "patent";
+  onPick: () => void;
 }
 
-const TransferEdge: React.FC<EdgeProps> = ({ topOffset, lag }) => (
-  <>
-    <div
-      className="absolute left-0 right-0 h-px node-connector opacity-40"
-      style={{ top: `${topOffset}px` }}
-    />
-    <div
-      className="absolute left-1/2 -translate-x-1/2 bg-surface-container px-3 py-1 rounded-full border border-tertiary/20 shadow-xl"
-      style={{ top: `${topOffset - 15}px` }}
+function SuggestionItem({ label, sub, type, onPick }: SuggestionItemProps) {
+  const accent = type === "paper" ? "#22d3ee" : "#4ade80";
+  return (
+    <button
+      onMouseDown={onPick}   // mouseDown fires before the input's onBlur
+      style={{
+        display:      "flex",
+        alignItems:   "center",
+        gap:          10,
+        width:        "100%",
+        padding:      "8px 14px",
+        background:   "transparent",
+        border:       "none",
+        cursor:       "pointer",
+        textAlign:    "left",
+        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        transition:   "background 100ms",
+      }}
+      onMouseEnter={e => (e.currentTarget.style.background = `${accent}12`)}
+      onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
-      <span className="text-[10px] font-bold text-tertiary font-label tracking-tighter">
-        {lag}
+      {/* type badge */}
+      <span style={{
+        fontSize:    9,
+        color:       accent,
+        fontWeight:  700,
+        width:       46,
+        flexShrink:  0,
+        fontFamily:  "monospace",
+        textTransform: "uppercase",
+      }}>
+        {type}
       </span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 10, color: "#4a6070", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {sub}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+
+// ── Search bar component ──────────────────────────────────────────────────────
+
+interface SearchBarProps {
+  query:    string;
+  onChange: (q: string) => void;
+  onClear:  () => void;
+  data:     GraphData | null;
+}
+
+function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Build suggestion list (max 8 items, papers first)
+  const suggestions = useMemo(() => {
+    if (!data || !query.trim()) return [];
+    const q = query.trim().toLowerCase();
+
+    const paperHits = data.papers
+      .filter(p => p.title.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map(p => ({ id: p.id, label: p.title, sub: p.id, type: "paper" as const }));
+
+    const patentHits = data.patents
+      .filter(p => p.title.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))
+      .slice(0, 4)
+      .map(p => ({ id: p.id, label: p.title, sub: p.id, type: "patent" as const }));
+
+    return [...paperHits, ...patentHits].slice(0, 8);
+  }, [query, data]);
+
+  const showDropdown = focused && suggestions.length > 0;
+  const accent       = "#22d3ee";
+
+  return (
+    <div style={{ position: "relative", width: 400 }}>
+
+      {/* Input row */}
+      <div style={{
+        display:        "flex",
+        alignItems:     "center",
+        gap:            8,
+        background:     focused ? "rgba(34,211,238,0.06)" : "rgba(255,255,255,0.04)",
+        border:         `1px solid ${focused ? "rgba(34,211,238,0.45)" : "rgba(255,255,255,0.10)"}`,
+        borderRadius:   showDropdown ? "8px 8px 0 0" : 8,
+        padding:        "7px 12px",
+        transition:     "all 150ms",
+      }}>
+        {/* magnifier icon */}
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke={focused ? accent : "#4a6070"} strokeWidth="2.5" strokeLinecap="round">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 120)} // slight delay so mouseDown fires
+          placeholder="Search papers or patents by title / ID…"
+          style={{
+            flex:       1,
+            background: "transparent",
+            border:     "none",
+            outline:    "none",
+            color:      "#e2e8f0",
+            fontSize:   12,
+            fontFamily: "Inter, system-ui, sans-serif",
+          }}
+        />
+
+        {/* result count pill */}
+        {query && data && (
+          <span style={{
+            fontSize:     9,
+            color:        "#4a6070",
+            fontFamily:   "monospace",
+            whiteSpace:   "nowrap",
+            padding:      "2px 6px",
+            background:   "rgba(255,255,255,0.05)",
+            borderRadius: 4,
+          }}>
+            {filterGraphBySearch(data, query).total_papers}P · {filterGraphBySearch(data, query).total_patents}PT
+          </span>
+        )}
+
+        {/* clear button */}
+        {query && (
+          <button
+            onClick={() => { onClear(); inputRef.current?.focus(); }}
+            style={{ background: "none", border: "none", color: "#4a6070", cursor: "pointer", fontSize: 17, lineHeight: 1, padding: 0 }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      {/* Suggestion dropdown */}
+      {showDropdown && (
+        <div style={{
+          position:       "absolute",
+          top:            "100%",
+          left:           0,
+          right:          0,
+          background:     "rgba(4,9,20,0.98)",
+          border:         "1px solid rgba(34,211,238,0.22)",
+          borderTop:      "none",
+          borderRadius:   "0 0 8px 8px",
+          backdropFilter: "blur(20px)",
+          zIndex:         200,
+          overflow:       "hidden",
+          boxShadow:      "0 16px 40px rgba(0,0,0,0.8)",
+        }}>
+          <div style={{ padding: "6px 14px 4px", fontSize: 9, color: "#3a5a70", fontFamily: "monospace", letterSpacing: "0.10em", textTransform: "uppercase" }}>
+            Suggestions
+          </div>
+          {suggestions.map(s => (
+            <SuggestionItem
+              key={s.id}
+              label={s.label}
+              sub={s.sub}
+              type={s.type}
+              onPick={() => { onChange(s.label); setFocused(false); }}
+            />
+          ))}
+        </div>
+      )}
     </div>
-    <div
-      className="absolute right-0 translate-x-1/2 text-secondary"
-      style={{ top: `${topOffset - 5}px` }}
-    >
-      <ArrowRight className="w-4 h-4" />
+  );
+}
+
+
+// ── Loading / Error screens ───────────────────────────────────────────────────
+
+function LoadingScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full"
+      style={{ background: "radial-gradient(ellipse at 30% 40%, #060e1f 0%, #020811 100%)" }}>
+      <div className="relative w-24 h-24 mb-8">
+        <div className="absolute inset-0 rounded-full border-2 border-cyan-400/20 border-t-cyan-400"
+          style={{ animation: "spin 1.2s linear infinite" }} />
+        <div className="absolute inset-3 rounded-full border-2 border-green-400/20 border-b-green-400"
+          style={{ animation: "spin 1.8s linear infinite reverse" }} />
+        <div className="absolute inset-0 flex items-center justify-center text-2xl">⬡</div>
+      </div>
+      <p className="text-cyan-400/70 text-sm tracking-widest uppercase font-mono">
+        Loading Knowledge Graph…
+      </p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
-  </>
-);
+  );
+}
+
+function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-6"
+      style={{ background: "radial-gradient(ellipse at 30% 40%, #1a0614 0%, #020811 100%)" }}>
+      <div className="text-5xl">⚠</div>
+      <p className="text-red-400 font-mono text-sm max-w-xs text-center">{message}</p>
+      <button onClick={onRetry}
+        className="px-6 py-2 border border-red-400/40 text-red-400 rounded-lg text-xs font-bold tracking-widest uppercase hover:bg-red-400/10 transition-colors">
+        Retry
+      </button>
+    </div>
+  );
+}
+
+
+// ── Top bar ───────────────────────────────────────────────────────────────────
+
+interface TopBarProps {
+  limit:       number;
+  minSim:      number;
+  loading:     boolean;
+  searchQuery: string;
+  data:        GraphData | null;
+  onApply:     (limit: number, minSim: number) => void;
+  onSearch:    (q: string) => void;
+  onClear:     () => void;
+}
+
+function TopBar({ limit, minSim, loading, searchQuery, data, onApply, onSearch, onClear }: TopBarProps) {
+  const [localLimit,  setLocalLimit]  = useState(limit);
+  const [localMinSim, setLocalMinSim] = useState(minSim);
+
+  const inputStyle: React.CSSProperties = {
+    width: 52, background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.10)", borderRadius: 6,
+    padding: "4px 8px", color: "#fff", fontSize: 11,
+    fontFamily: "monospace", outline: "none",
+  };
+
+  return (
+    <div style={{
+      display:        "flex",
+      alignItems:     "center",
+      gap:            16,
+      padding:        "10px 20px",
+      borderBottom:   "1px solid rgba(255,255,255,0.05)",
+      background:     "rgba(2,8,17,0.92)",
+      backdropFilter: "blur(16px)",
+      zIndex:         100,
+      flexShrink:     0,
+    }}>
+      {/* brand */}
+      <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#22d3ee", letterSpacing: "0.14em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+        Paper ↔ Patent
+      </span>
+
+      {/* search — centre of top bar */}
+      <SearchBar query={searchQuery} onChange={onSearch} onClear={onClear} data={data} />
+
+      <div style={{ flex: 1 }} />
+
+      {/* compact filter inputs */}
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#4a6070", fontFamily: "monospace", textTransform: "uppercase" }}>
+        Limit <input type="number" min={1} max={200} value={localLimit}
+          onChange={e => setLocalLimit(Number(e.target.value))} style={inputStyle} />
+      </label>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: "#4a6070", fontFamily: "monospace", textTransform: "uppercase" }}>
+        Min Sim <input type="number" min={0} max={1} step={0.05} value={localMinSim}
+          onChange={e => setLocalMinSim(Number(e.target.value))} style={inputStyle} />
+      </label>
+
+      <button
+        onClick={() => onApply(localLimit, localMinSim)}
+        disabled={loading}
+        style={{
+          padding: "6px 14px", background: "rgba(34,211,238,0.08)",
+          border: "1px solid rgba(34,211,238,0.28)", borderRadius: 7,
+          color: "#22d3ee", fontFamily: "monospace", fontSize: 11,
+          fontWeight: 700, letterSpacing: "0.08em", cursor: loading ? "not-allowed" : "pointer",
+          opacity: loading ? 0.4 : 1, textTransform: "uppercase", transition: "all 150ms",
+        }}
+      >
+        {loading ? "…" : "Apply"}
+      </button>
+    </div>
+  );
+}
+
+
+// ── Zero-results overlay ──────────────────────────────────────────────────────
+
+function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <div style={{
+      position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 14, zIndex: 30,
+    }}>
+      <div style={{ fontSize: 38, opacity: 0.35 }}>🔍</div>
+      <p style={{ fontFamily: "monospace", fontSize: 12, color: "rgba(255,255,255,0.3)", textAlign: "center", lineHeight: 1.7 }}>
+        No papers or patents matching<br />
+        <span style={{ color: "#22d3ee" }}>"{query}"</span>
+      </p>
+      <button onClick={onClear} style={{
+        padding: "6px 16px", background: "transparent",
+        border: "1px solid rgba(255,255,255,0.14)", borderRadius: 6,
+        color: "rgba(255,255,255,0.4)", fontFamily: "monospace", fontSize: 11, cursor: "pointer",
+      }}>
+        Clear search
+      </button>
+    </div>
+  );
+}
+
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 const GraphPage: React.FC = () => {
+  const [limit,       setLimit]       = useState(50);
+  const [minSim,      setMinSim]      = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [data,    setData]    = useState<GraphData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
+
+  const [selectedId,   setSelectedId]   = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<SelectedEdgeState | null>(null);
+
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+
+  const loadGraph = useCallback(async (lim: number, sim: number) => {
+    setLoading(true);
+    setError(null);
+    setSelectedId(null);
+    setSelectedEdge(null);
+    setSearchQuery("");
+    try {
+      const result = await fetchGraphData(lim, sim);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadGraph(limit, minSim); }, []); // eslint-disable-line
+
+  const handleApplyFilters = (newLimit: number, newMinSim: number) => {
+    setLimit(newLimit);
+    setMinSim(newMinSim);
+    loadGraph(newLimit, newMinSim);
+  };
+
+  // ── Filtered data (client-side, no extra fetch) ────────────────────────────
+
+  const visibleData = useMemo(
+    () => (data ? filterGraphBySearch(data, searchQuery) : null),
+    [data, searchQuery],
+  );
+
+  const noResults =
+    !!searchQuery.trim() &&
+    !!visibleData &&
+    visibleData.total_papers === 0 &&
+    visibleData.total_patents === 0;
+
+  // ── Selection ──────────────────────────────────────────────────────────────
+
+  const handleNodeSelect = useCallback((node: GraphNode) => {
+    setSelectedId(node.id);
+    setSelectedEdge(null);
+  }, []);
+
+  const handleEdgeSelect = useCallback((state: SelectedEdgeState) => {
+    setSelectedEdge(state);
+    setSelectedId(null);
+  }, []);
+
+  const handleDeselect = useCallback(() => {
+    setSelectedId(null);
+    setSelectedEdge(null);
+  }, []);
+
+  const selectedNode = visibleData
+    ? ([...visibleData.papers, ...visibleData.patents] as GraphNode[]).find(n => n.id === selectedId) ?? null
+    : null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
   return (
-    <main className="lg:ml-64 pt-24 pb-12 px-10 min-h-screen">
-      {/* Header */}
-      <header className="mb-12 flex justify-between items-end">
-        <div>
-          <h1 className="text-5xl font-bold font-headline tracking-tight text-on-surface mb-2">
-            Bipartite Transfer Graph
-          </h1>
-          <p className="text-on-surface-variant max-w-2xl text-lg">
-            Visualizing the temporal latency between theoretical discovery
-            (Science) and practical implementation (Engineering).
-          </p>
-        </div>
-        <div className="flex gap-4">
-          <div className="flex items-center gap-2 bg-surface-container-high px-4 py-2 rounded-xl border border-outline-variant/15">
-            <span className="w-3 h-3 rounded-full bg-primary animate-pulse" />
-            <span className="text-sm font-medium font-label">
-              Active Synchronization
-            </span>
-          </div>
-        </div>
-      </header>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#020811", color: "#fff", overflow: "hidden" }}>
 
-      {/* Bipartite Graph Grid */}
-      <div className="grid grid-cols-12 gap-0 min-h-[700px] relative">
-        {/* Scientist Column */}
-        <div className="col-span-4 flex flex-col gap-12 z-10">
-          <div className="text-xs font-bold tracking-[0.2em] text-primary uppercase mb-4 pl-4 border-l border-primary/30">
-            Theoretical Origin (Nodes)
-          </div>
-          <ScientistNode
-            name="Alan Turing"
-            title="Universal Machine Theory, 1936"
-            tags={["COMPUTABILITY", "LOGIC"]}
-          />
-          <ScientistNode
-            name="John von Neumann"
-            title="Stored-Program Concept, 1945"
-            tags={["ARCHITECTURE", "GAME THEORY"]}
-          />
-          <ScientistNode
-            name="Niels Bohr"
-            title="Quantum Mechanics, 1913"
-            tags={["QUANTUM PHYSICS", "ATOMIC MODEL"]}
-          />
-        </div>
+      <TopBar
+        limit={limit}
+        minSim={minSim}
+        loading={loading}
+        searchQuery={searchQuery}
+        data={data}
+        onApply={handleApplyFilters}
+        onSearch={q => { setSearchQuery(q); setSelectedId(null); setSelectedEdge(null); }}
+        onClear={() => { setSearchQuery(""); setSelectedId(null); setSelectedEdge(null); }}
+      />
 
-        {/* Transfer Edges (Center) */}
-        <div className="col-span-4 relative h-full pointer-events-none">
-          <TransferEdge topOffset={135} lag="73 YR LAG" />
-          <TransferEdge topOffset={310} lag="56 YR LAG" />
-          <TransferEdge topOffset={485} lag="98 YR LAG" />
-        </div>
+      <div style={{ position: "relative", flex: 1, overflow: "hidden" }}>
 
-        {/* Engineer Column */}
-        <div className="col-span-4 flex flex-col gap-12 z-10">
-          <div className="text-xs font-bold tracking-[0.2em] text-secondary uppercase mb-4 pr-4 border-r border-secondary/30 text-right">
-            Practical Implementation (Nodes)
+        {loading && <div style={{ position: "absolute", inset: 0, zIndex: 50 }}><LoadingScreen /></div>}
+        {error && !loading && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 50 }}>
+            <ErrorScreen message={error} onRetry={() => loadGraph(limit, minSim)} />
           </div>
-          <EngineerNode
-            name="Deep Learning Engineers"
-            title="Neural Network Scaling, 2012"
-            tags={["AI OPS", "HPC"]}
+        )}
+
+        {/* 3-D canvas uses the filtered dataset */}
+        {visibleData && !noResults && (
+          <BipartiteGraph3D
+            data={visibleData}
+            selectedId={selectedId}
+            onNodeSelect={handleNodeSelect}
+            onNodeInvestigate={handleNodeSelect}
+            onEdgeSelect={handleEdgeSelect}
+            onDeselect={handleDeselect}
           />
-          <EngineerNode
-            name="IBM Systems Team"
-            title="Mainframe Virtualization, 2001"
-            tags={["HARDWARE", "KRNL"]}
+        )}
+
+        {noResults && <NoResults query={searchQuery} onClear={() => setSearchQuery("")} />}
+
+        {visibleData && <StatsBar data={visibleData} />}
+        <Legend />
+        <ClickHint hasSelection={!!selectedNode || !!selectedEdge} />
+
+        {selectedNode && !selectedEdge && (
+          <NodeInfoPanel node={selectedNode} onClose={handleDeselect} />
+        )}
+
+        {selectedEdge && (
+          <EdgeInfoPanel
+            edge={selectedEdge.edge}
+            screenX={selectedEdge.screenX}
+            screenY={selectedEdge.screenY}
+            onClose={() => setSelectedEdge(null)}
           />
-          <EngineerNode
-            name="Quantum Computing Team"
-            title="Superconducting Qubits, 2019"
-            tags={["CRYO-COOLING", "NOISE REDUX"]}
-          />
-        </div>
+        )}
       </div>
-
-      {/* Transfer Efficiency Index */}
-      <div className="mt-20 grid grid-cols-12 gap-8">
-        <div className="col-span-8 bg-surface-container-high rounded-2xl p-8 border border-outline-variant/10">
-          <h4 className="font-headline font-bold text-2xl text-on-surface mb-6">
-            Transfer Efficiency Index
-          </h4>
-          <div className="flex items-center gap-12">
-            <div className="flex-1">
-              <div className="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
-                <div className="h-full bg-primary w-3/4" />
-              </div>
-              <p className="mt-2 text-xs text-on-surface-variant font-label uppercase tracking-widest">
-                Theoretical Saturation (75%)
-              </p>
-            </div>
-            <div className="flex-1">
-              <div className="h-2 w-full bg-surface-container-low rounded-full overflow-hidden">
-                <div className="h-full bg-secondary w-1/4" />
-              </div>
-              <p className="mt-2 text-xs text-on-surface-variant font-label uppercase tracking-widest">
-                Engineering Conversion (25%)
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="col-span-4 bg-tertiary-container rounded-2xl p-8 text-on-tertiary-container">
-          <Rocket className="w-12 h-12 mb-4" />
-          <h4 className="font-headline font-bold text-xl mb-2">
-            Accelerate Handoff
-          </h4>
-          <p className="text-sm opacity-80 mb-6">
-            Reduce systemic lag by automating the translation between abstract
-            notation and practical schemas.
-          </p>
-          <button className="w-full py-3 bg-on-tertiary-container text-tertiary-container font-bold rounded-xl active:scale-95 transition-transform">
-            Deploy Synapse V2
-          </button>
-        </div>
-      </div>
-
-      {/* Background Decorative */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 overflow-hidden">
-        <div className="absolute top-[-10%] left-[-5%] w-[40%] h-[40%] bg-primary/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[30%] h-[30%] bg-secondary/5 blur-[120px] rounded-full" />
-      </div>
-    </main>
+    </div>
   );
 };
 

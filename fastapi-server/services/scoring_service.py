@@ -1,10 +1,7 @@
-def compute_probability(similarity, time_gap, novelty):
-    time_score = 1 / (1 + time_gap)
+def compute_probability(similarity, novelty, time_gap):
+    similarity = float(similarity)
+    novelty = float(novelty)
+    time_gap = float(time_gap)
 
-    probability = (
-        0.5 * similarity +
-        0.3 * time_score +
-        0.2 * novelty
-    )
-
-    return round(probability, 3)
+    score = (0.5 * similarity) + (0.3 * novelty) - (0.2 * (time_gap / 50))
+    return score

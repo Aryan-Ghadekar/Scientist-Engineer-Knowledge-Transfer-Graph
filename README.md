@@ -84,6 +84,10 @@ Scientist-Engineer-Knowledge-Transfer-Graph/
 │   │   └── main/java/...
 │   ├── pom.xml
 │   └── application.properties
+├── 📂 fastapi-server/                          # FastAPI backend
+│   ├── routes/
+│   ├── services/
+│   └── modules/
 │
 └── 📄 README.md
 ```
@@ -138,6 +142,56 @@ mvn spring-boot:run
 Open `http://localhost:8080` in your browser — you should see a JSON response or the API root message.
 
 ---
+
+## 🐍 Python Backend Setup (FastAPI + uv)
+
+### 1. Navigate to the server folder
+
+```bash
+cd fastapi-server
+```
+
+### 2. Build the project
+
+```bash
+pip install uv
+```
+### 3. Create Virtual Environment
+
+```bash
+uv venv
+```
+### 4. Activate Virtual Environment
+```bash
+.venv\Scripts\activate
+```
+
+### 5. Install Dependencies
+```bash
+uv pip install -r requirements.txt
+```
+
+### 6. Run FastAPI Server
+```bash
+fastapi dev
+```
+
+> ✅ Server starts at → **http://localhost:8000**
+
+### 7. Verify it's running
+
+Open `http://localhost:8000` in your browser — you should see a JSON response or the API root message.
+
+---
+
+### 5. Full Architecture
+```bash
+Frontend (React - 5173)
+        │
+        ├── Spring Boot (8080)
+        │
+        └── FastAPI (8000)  ← Temporal + AI Analysis
+```
 
 ## ⚡ Frontend Setup (React + Vite)
 

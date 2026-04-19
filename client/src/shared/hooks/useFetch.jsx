@@ -1,33 +1,37 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../services/api";
 
-const useFetch = (url) => {
-    const [data, setData] = useState(null);
+const useFetch = (url: string) => {
+    const [data, setData] = useState < any > (null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState < string | null > (null);
 
-    useEffect (() => {
-    const fetchData = async () => {
-        setLoading(true);
-        setError(null);
+    useEffect(() => {
+        let isMounted = true;
 
-        try {
-            const result = await apiRequest({
-                endpoint: url,
-                method : 'GET',
-            });
+        const fetchData = async () => {
+            setLoading(true);
+            setError(null);
 
-            setData(result);
-        } catch (err) {
-            setError(err.message);
-            // setStatus("error");
-            throw err;
-        } finally {
-            setLoading(false);
-        }
-    };
+            try {
+                const result = await apiRequest({
+                    endpoint: url,
+                    method: "GET",
+                });
 
-    if(url) fetchData();
+                if (isMounted) setData(result);
+            } catch (err: any) {
+                if (isMounted) setError(err?.message || "Something went wrong");
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        if (url) fetchData();
+
+        return () => {
+            isMounted = false;
+        };
     }, [url]);
 
     return { data, loading, error };

@@ -1,21 +1,25 @@
-
-
-
 import {
   Activity,
   ChevronLeft,
   ChevronRight,
   Clock,
   Download,
+  Filter,
   Lightbulb,
   ListFilter,
   LucideIcon,
   Network,
   Search,
+  SearchAlertIcon,
   TrendingUp,
   Zap,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import LagFilterPanel from "../components/LagAnalysis/LagFilterPanel";
+import Pagination from "../components/LagAnalysis/Pagination";
+import TableState from "../components/LagAnalysis/TableState";
+import TableSkeleton from "../components/LagAnalysis/TableSkeleton";
+
 
 /* ---------------- TYPES ---------------- */
 
@@ -52,6 +56,8 @@ interface TrendItem {
   year: number;
   avg_lag: number;
 }
+
+
 
 
 /* ---------------- COMPONENTS ---------------- */
@@ -137,14 +143,34 @@ const LagAnalysisPage: React.FC = () => {
   });
   const [trend, setTrend] = useState<TrendItem[]>([]);
 
+  const [filters, setFilters] = useState({
+    minYear: 1900,
+    maxYear: 2025,
+    minLag: 0,
+    maxLag: 100,
+    sortBy: "lag",
+  });
   /* ---------------- FETCH DATA ---------------- */
+
+  // const { data, loading, error } = useFetch(
+  //   "http://localhost:8000/api/temporal-analysis"
+  // );
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        const res = await fetch(
-          "http://localhost:8000/api/temporal-analysis"
-        );
+        const res = await fetch("http://localhost:8000/api/temporal-analysis");
+
+        if (!res.ok) {
+          throw new Error("Server error");
+        }
+
         const data = await res.json();
 
         setStats({
@@ -156,46 +182,47 @@ const LagAnalysisPage: React.FC = () => {
 
         setTrend(data.trend || []);
 
-        const formatted: LagRowProps[] = (data.rows || []).map(
-          (d: ApiRow) => {
-            const lag = d.time_gap;
+        const formatted: LagRowProps[] = (data.rows || []).map((d: ApiRow) => {
+          const lag = d.time_gap;
 
-            return {
-              discovery: d.paper_title || `Paper ${d.paper_id}`,   
-              discoveryYear: d.paper_year || 0,                    
-              implementation: d.patent_title || "Patent",          
-              implementationYear: d.patent_year || 0,            
-              lag: `${lag} yrs`,
+          return {
+            discovery: d.paper_title || `Paper ${d.paper_id}`,
+            discoveryYear: d.paper_year || 0,
+            implementation: d.patent_title || "Patent",
+            implementationYear: d.patent_year || 0,
+            lag: `${lag} yrs`,
 
-              lagColor:
-                lag > 30
-                  ? "text-error"
-                  : lag > 10
-                    ? "text-tertiary"
-                    : "text-secondary",
+            lagColor:
+              lag > 30
+                ? "text-error"
+                : lag > 10
+                  ? "text-tertiary"
+                  : "text-secondary",
 
-              lagBg:
-                lag > 30
-                  ? "bg-error-container/20"
-                  : lag > 10
-                    ? "bg-tertiary-container/20"
-                    : "bg-secondary-container/20",
+            lagBg:
+              lag > 30
+                ? "bg-error-container/20"
+                : lag > 10
+                  ? "bg-tertiary-container/20"
+                  : "bg-secondary-container/20",
 
-              lagBorder:
-                lag > 30
-                  ? "border-error/20"
-                  : lag > 10
-                    ? "border-tertiary/20"
-                    : "border-secondary/20",
+            lagBorder:
+              lag > 30
+                ? "border-error/20"
+                : lag > 10
+                  ? "border-tertiary/20"
+                  : "border-secondary/20",
 
-              pulse: lag > 50,
-            };
-          }
-        );
+            pulse: lag > 50,
+          };
+        });
 
         setRows(formatted);
-      } catch (err) {
-        console.error("Failed to fetch temporal data", err);
+      } catch (err: any) {
+        console.error(err);
+        setError(err.message || "Something went wrong");
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -204,9 +231,42 @@ const LagAnalysisPage: React.FC = () => {
 
   /* ---------------- FILTER ---------------- */
 
-  const filtered = rows.filter((r) =>
-    r.discovery.toLowerCase().includes(search.toLowerCase())
+  const filtered = rows
+    .filter((r) =>
+      r.discovery.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((r) =>
+      r.discoveryYear >= filters.minYear &&
+      r.discoveryYear <= filters.maxYear
+    )
+    .filter((r) => {
+      const lag = parseInt(r.lag);
+      return lag >= filters.minLag && lag <= filters.maxLag;
+    })
+    .sort((a, b) => {
+      if (filters.sortBy === "lag") {
+        return parseInt(b.lag) - parseInt(a.lag);
+      } else {
+        return b.discoveryYear - a.discoveryYear;
+      }
+    });
+
+  /* ---------------- Pagination ---------------- */
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8)
+
+  const totalPages = Math.ceil(filtered.length / pageSize);
+
+  const paginatedData = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, search]);
+
 
   /* ---------------- UI ---------------- */
 
@@ -272,6 +332,43 @@ const LagAnalysisPage: React.FC = () => {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              {(filters.minYear !== 1900 || filters.maxYear !== 2025) && (
+                <span className="px-3 py-1 text-xs rounded-full bg-cyan-400/10 text-cyan-400 border border-cyan-400/20">
+                  Year: {filters.minYear} - {filters.maxYear}
+                </span>
+              )}
+
+              {(filters.minLag !== 0 || filters.maxLag !== 100) && (
+                <span className="px-3 py-1 text-xs rounded-full bg-purple-400/10 text-purple-400 border border-purple-400/20">
+                  Lag: {filters.minLag} - {filters.maxLag}
+                </span>
+              )}
+
+              {/* Clear button */}
+              {(filters.minYear !== 1900 ||
+                filters.maxYear !== 2025 ||
+                filters.minLag !== 0 ||
+                filters.maxLag !== 100) && (
+                  <button
+                    onClick={() =>
+                      setFilters({
+                        minYear: 1900,
+                        maxYear: 2025,
+                        minLag: 0,
+                        maxLag: 100,
+                        sortBy: "lag",
+                      })
+                    }
+                    className="text-xs px-3 py-1 border border-red-400/30 text-red-400 rounded-full hover:bg-red-400/10"
+                  >
+                    Clear Filters ✕
+                  </button>
+                )}
+            </div>
+            <div className="flex items-center gap-3">
+              <LagFilterPanel onApply={setFilters} />
+            </div>
           </div>
 
           {/* Table */}
@@ -297,9 +394,29 @@ const LagAnalysisPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row, i) => (
-                  <LagRow key={i} {...row} />
-                ))}
+                {loading ? (
+                  <TableSkeleton rows={10} />
+                ) : error ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <TableState
+                        type="error"
+                        message="Failed to fetch temporal data"
+                        onRetry={() => window.location.reload()}
+                      />
+                    </td>
+                  </tr>
+                ) : paginatedData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <TableState type="empty" />
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedData.map((row, i) => (
+                    <LagRow key={i} {...row} />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -307,40 +424,30 @@ const LagAnalysisPage: React.FC = () => {
           {/* Footer */}
           <div className="px-8 py-4 flex justify-between items-center">
             <p className="text-xs">
-              Showing {filtered.length} of {stats.total} records
+              Showing {paginatedData.length} of {stats.total} records
             </p>
-            <div className="flex space-x-2">
-              <button className="p-2" disabled>
-                <ChevronLeft />
-              </button>
-              <button className="p-2">
-                <ChevronRight />
-              </button>
+
+            <div className="flex items-center gap-2">
+              <p className="text-xs">
+                No of rows per page
+              </p>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="bg-surface-container-high px-3 py-1 rounded-md text-xs"
+              >
+                <option value={8}>8</option>
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+              </select>
             </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </section>
-
-        {/* Trend Chart */}
-        {/* <section className="mt-12">
-          <div className="bg-surface-container-high p-8 rounded-2xl">
-            <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
-              <Activity className="w-5 h-5 text-primary" />
-              <span>Global Lag Trend</span>
-            </h3>
-
-            <div className="h-64 flex items-end space-x-2">
-              {trend.map((t, i) => (
-                <div
-                  key={i}
-                  className="w-full bg-tertiary-container/30 rounded-t-lg"
-                  style={{
-                    height: `${Math.min(t.avg_lag * 2, 100)}%`,
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </section> */}
       </div>
     </main>
   );

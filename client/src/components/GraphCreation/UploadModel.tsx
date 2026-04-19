@@ -1,3 +1,4 @@
+import { File } from "lucide-react";
 import React, { useState } from "react";
 
 interface Props {
@@ -28,11 +29,11 @@ const UploadModal: React.FC<Props> = ({ open, onClose }) => {
       });
 
       const data = await res.json();
-      setStatus(`✅ ${data.message}`);
+      setStatus(`${data.message}`);
       setTimeout(onClose, 1200);
     } catch (err) {
       console.error(err);
-      setStatus("❌ Upload failed");
+      setStatus("Upload failed");
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,9 @@ const UploadModal: React.FC<Props> = ({ open, onClose }) => {
           />
 
           <label htmlFor="fileUpload" className="cursor-pointer block">
-            <div className="text-2xl mb-2 opacity-60">📁</div>
+            <div className="text-2xl mb-2 opacity-60 items-center">
+                <File />
+            </div>
 
             <p className="text-sm text-gray-300">
               {file ? file.name : "Click or drag CSV file here"}
@@ -97,7 +100,7 @@ const UploadModal: React.FC<Props> = ({ open, onClose }) => {
 
         {/* STATUS */}
         {status && (
-          <div className="mt-4 text-xs font-mono text-center text-cyan-400">
+          <div className={`mt-4 text-xs font-mono text-center ${status === "Upload failed" ? "text-red-400" : "text-green-400"}`}>
             {status}
           </div>
         )}

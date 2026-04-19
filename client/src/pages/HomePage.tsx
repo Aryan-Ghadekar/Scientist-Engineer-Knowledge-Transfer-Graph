@@ -12,7 +12,7 @@ const HomePage: React.FC = () => {
     const seen = localStorage.getItem("seenUploadHint");
 
     if (!seen) {
-      setTimeout(() => setShowHint(true), 800); // slight delay for smooth UX
+      setTimeout(() => setShowHint(true), 800); 
     }
   }, []);
 

@@ -115,7 +115,7 @@ const ActivityItem: React.FC<ActivityItemProps> = ({
 
 const DashboardPage: React.FC = () => {
   return (
-    <main className="lg:ml-64 pt-24 px-10 pb-20 min-h-screen">
+    <main className="pt-24 px-10 pb-20 min-h-screen">
       {/* Header */}
       <div className="mb-12">
         <h1 className="text-5xl font-bold text-[#818cf8] tracking-tight mb-2">

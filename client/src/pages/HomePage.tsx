@@ -1,12 +1,23 @@
 import { ArrowDown, BarChart2, FlaskConical, Plus, Rocket } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import UploadModal from "../components/GraphCreation/UploadModel";
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+
+  useEffect(() => {
+    const seen = localStorage.getItem("seenUploadHint");
+
+    if (!seen) {
+      setTimeout(() => setShowHint(true), 800); // slight delay for smooth UX
+    }
+  }, []);
 
   return (
-    <main className="lg:ml-64 pt-24 px-8 md:px-12 lg:px-20 pb-20 min-h-screen">
+    <main className=" pt-24 px-8 md:px-12 lg:px-20 pb-20 min-h-screen">
       {/* Hero Section */}
       <section className="max-w-6xl mb-24 relative">
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-primary/10 blur-[120px] rounded-full pointer-events-none" />
@@ -43,6 +54,7 @@ const HomePage: React.FC = () => {
             </button>
           </div>
         </div>
+        <UploadModal open={open} onClose={() => setOpen(false)} />
       </section>
 
       {/* SIPOC Table + Sync Card */}
@@ -122,7 +134,7 @@ const HomePage: React.FC = () => {
             </div>
             <div className="relative z-10">
               <span className="material-symbols-outlined text-primary mb-4 block">
-                  <BarChart2 className="text-primary mb-4 w-6 h-6" />
+                <BarChart2 className="text-primary mb-4 w-6 h-6" />
               </span>
               <h4 className="text-xl font-bold font-headline mb-2">
                 Sync Latency
@@ -137,7 +149,7 @@ const HomePage: React.FC = () => {
                 </span>
                 <span className="text-secondary text-sm font-bold mb-1 flex items-center">
                   <span className="material-symbols-outlined text-xs">
-                    <ArrowDown className="w-4 h-4 text-secondary"/>
+                    <ArrowDown className="w-4 h-4 text-secondary" />
                   </span>{" "}
                   12%
                 </span>
@@ -148,9 +160,33 @@ const HomePage: React.FC = () => {
       </div>
 
       {/* FAB */}
-      <button className="fixed bottom-8 right-8 w-16 h-16 bg-primary text-on-primary rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all z-50">
-        <Plus className="w-6 h-6"/>
+      <button
+        onClick={() => {
+          setOpen(true);
+          setShowHint(false);
+          localStorage.setItem("seenUploadHint", "true");
+        }}
+        className="fixed bottom-8 right-8 w-16 h-16 bg-primary text-on-primary rounded-2xl shadow-2xl flex items-center justify-center"
+      >
+        <Plus className="w-6 h-6" />
       </button>
+      {showHint && (
+        <div className="fixed bottom-28 right-8 z-50 animate-fade-in">
+          <div className="relative bg-[#020811] border border-cyan-400/30 rounded-lg px-4 py-3 shadow-xl w-56">
+
+            <p className="text-xs text-gray-300 font-mono leading-relaxed">
+              Upload your dataset to build the graph.
+            </p>
+
+            <p className="text-[10px] text-cyan-400 mt-1 font-mono">
+              Click the + button
+            </p>
+
+            {/* Arrow */}
+            <div className="absolute bottom-[-6px] right-6 w-3 h-3 bg-[#020811] border-r border-b border-cyan-400/30 rotate-45" />
+          </div>
+        </div>
+      )}
     </main>
   );
 };

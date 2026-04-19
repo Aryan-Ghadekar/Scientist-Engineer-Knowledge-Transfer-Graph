@@ -13,8 +13,8 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 
 import BipartiteGraph3D from "../components/Bipartitegraph3d";
-import NodeInfoPanel    from "../components/Nodeinfopanel";
-import EdgeInfoPanel    from "../components/Edgeinfopanel";
+import NodeInfoPanel from "../components/Nodeinfopanel";
+import EdgeInfoPanel from "../components/Edgeinfopanel";
 import { StatsBar, Legend, ClickHint } from "../components/GraphHUD";
 
 import {
@@ -30,7 +30,7 @@ const API_BASE = "http://localhost:8000";
 
 async function fetchGraphData(limit: number, minSim: number): Promise<GraphData> {
   const url = `${API_BASE}/api/graph/bipartite?limit=${limit}&min_similarity=${minSim}`;
-  const res  = await fetch(url);
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
   return res.json() as Promise<GraphData>;
 }
@@ -67,24 +67,24 @@ function filterGraphBySearch(data: GraphData, query: string): GraphData {
   );
 
   // 3. Pull in the other endpoint of each relevant edge (shows the connections)
-  const visiblePaperIds  = new Set(matchedPaperIds);
+  const visiblePaperIds = new Set(matchedPaperIds);
   const visiblePatentIds = new Set(matchedPatentIds);
   relevantEdges.forEach(e => {
     visiblePaperIds.add(e.source);
     visiblePatentIds.add(e.target);
   });
 
-  const filteredPapers  = data.papers.filter(p => visiblePaperIds.has(p.id));
+  const filteredPapers = data.papers.filter(p => visiblePaperIds.has(p.id));
   const filteredPatents = data.patents.filter(p => visiblePatentIds.has(p.id));
 
   return {
     ...data,
-    papers:        filteredPapers,
-    patents:       filteredPatents,
-    edges:         relevantEdges,
-    total_papers:  filteredPapers.length,
+    papers: filteredPapers,
+    patents: filteredPatents,
+    edges: relevantEdges,
+    total_papers: filteredPapers.length,
     total_patents: filteredPatents.length,
-    total_edges:   relevantEdges.length,
+    total_edges: relevantEdges.length,
   };
 }
 
@@ -92,9 +92,9 @@ function filterGraphBySearch(data: GraphData, query: string): GraphData {
 // ── Suggestion dropdown item ──────────────────────────────────────────────────
 
 interface SuggestionItemProps {
-  label:  string;
-  sub:    string;
-  type:   "paper" | "patent";
+  label: string;
+  sub: string;
+  type: "paper" | "patent";
   onPick: () => void;
 }
 
@@ -104,29 +104,29 @@ function SuggestionItem({ label, sub, type, onPick }: SuggestionItemProps) {
     <button
       onMouseDown={onPick}   // mouseDown fires before the input's onBlur
       style={{
-        display:      "flex",
-        alignItems:   "center",
-        gap:          10,
-        width:        "100%",
-        padding:      "8px 14px",
-        background:   "transparent",
-        border:       "none",
-        cursor:       "pointer",
-        textAlign:    "left",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        width: "100%",
+        padding: "8px 14px",
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        textAlign: "left",
         borderBottom: "1px solid rgba(255,255,255,0.04)",
-        transition:   "background 100ms",
+        transition: "background 100ms",
       }}
       onMouseEnter={e => (e.currentTarget.style.background = `${accent}12`)}
       onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
     >
       {/* type badge */}
       <span style={{
-        fontSize:    9,
-        color:       accent,
-        fontWeight:  700,
-        width:       46,
-        flexShrink:  0,
-        fontFamily:  "monospace",
+        fontSize: 9,
+        color: accent,
+        fontWeight: 700,
+        width: 46,
+        flexShrink: 0,
+        fontFamily: "monospace",
         textTransform: "uppercase",
       }}>
         {type}
@@ -147,10 +147,10 @@ function SuggestionItem({ label, sub, type, onPick }: SuggestionItemProps) {
 // ── Search bar component ──────────────────────────────────────────────────────
 
 interface SearchBarProps {
-  query:    string;
+  query: string;
   onChange: (q: string) => void;
-  onClear:  () => void;
-  data:     GraphData | null;
+  onClear: () => void;
+  data: GraphData | null;
 }
 
 function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
@@ -176,21 +176,21 @@ function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
   }, [query, data]);
 
   const showDropdown = focused && suggestions.length > 0;
-  const accent       = "#22d3ee";
+  const accent = "#22d3ee";
 
   return (
     <div style={{ position: "relative", width: 400 }}>
 
       {/* Input row */}
       <div style={{
-        display:        "flex",
-        alignItems:     "center",
-        gap:            8,
-        background:     focused ? "rgba(34,211,238,0.06)" : "rgba(255,255,255,0.04)",
-        border:         `1px solid ${focused ? "rgba(34,211,238,0.45)" : "rgba(255,255,255,0.10)"}`,
-        borderRadius:   showDropdown ? "8px 8px 0 0" : 8,
-        padding:        "7px 12px",
-        transition:     "all 150ms",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        background: focused ? "rgba(34,211,238,0.06)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${focused ? "rgba(34,211,238,0.45)" : "rgba(255,255,255,0.10)"}`,
+        borderRadius: showDropdown ? "8px 8px 0 0" : 8,
+        padding: "7px 12px",
+        transition: "all 150ms",
       }}>
         {/* magnifier icon */}
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -207,12 +207,12 @@ function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
           onBlur={() => setTimeout(() => setFocused(false), 120)} // slight delay so mouseDown fires
           placeholder="Search papers or patents by title / ID…"
           style={{
-            flex:       1,
+            flex: 1,
             background: "transparent",
-            border:     "none",
-            outline:    "none",
-            color:      "#e2e8f0",
-            fontSize:   12,
+            border: "none",
+            outline: "none",
+            color: "#e2e8f0",
+            fontSize: 12,
             fontFamily: "Inter, system-ui, sans-serif",
           }}
         />
@@ -220,12 +220,12 @@ function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
         {/* result count pill */}
         {query && data && (
           <span style={{
-            fontSize:     9,
-            color:        "#4a6070",
-            fontFamily:   "monospace",
-            whiteSpace:   "nowrap",
-            padding:      "2px 6px",
-            background:   "rgba(255,255,255,0.05)",
+            fontSize: 9,
+            color: "#4a6070",
+            fontFamily: "monospace",
+            whiteSpace: "nowrap",
+            padding: "2px 6px",
+            background: "rgba(255,255,255,0.05)",
             borderRadius: 4,
           }}>
             {filterGraphBySearch(data, query).total_papers}P · {filterGraphBySearch(data, query).total_patents}PT
@@ -246,18 +246,18 @@ function SearchBar({ query, onChange, onClear, data }: SearchBarProps) {
       {/* Suggestion dropdown */}
       {showDropdown && (
         <div style={{
-          position:       "absolute",
-          top:            "100%",
-          left:           0,
-          right:          0,
-          background:     "rgba(4,9,20,0.98)",
-          border:         "1px solid rgba(34,211,238,0.22)",
-          borderTop:      "none",
-          borderRadius:   "0 0 8px 8px",
+          position: "absolute",
+          top: "100%",
+          left: 0,
+          right: 0,
+          background: "rgba(4,9,20,0.98)",
+          border: "1px solid rgba(34,211,238,0.22)",
+          borderTop: "none",
+          borderRadius: "0 0 8px 8px",
           backdropFilter: "blur(20px)",
-          zIndex:         200,
-          overflow:       "hidden",
-          boxShadow:      "0 16px 40px rgba(0,0,0,0.8)",
+          zIndex: 200,
+          overflow: "hidden",
+          boxShadow: "0 16px 40px rgba(0,0,0,0.8)",
         }}>
           <div style={{ padding: "6px 14px 4px", fontSize: 9, color: "#3a5a70", fontFamily: "monospace", letterSpacing: "0.10em", textTransform: "uppercase" }}>
             Suggestions
@@ -317,18 +317,18 @@ function ErrorScreen({ message, onRetry }: { message: string; onRetry: () => voi
 // ── Top bar ───────────────────────────────────────────────────────────────────
 
 interface TopBarProps {
-  limit:       number;
-  minSim:      number;
-  loading:     boolean;
+  limit: number;
+  minSim: number;
+  loading: boolean;
   searchQuery: string;
-  data:        GraphData | null;
-  onApply:     (limit: number, minSim: number) => void;
-  onSearch:    (q: string) => void;
-  onClear:     () => void;
+  data: GraphData | null;
+  onApply: (limit: number, minSim: number) => void;
+  onSearch: (q: string) => void;
+  onClear: () => void;
 }
 
 function TopBar({ limit, minSim, loading, searchQuery, data, onApply, onSearch, onClear }: TopBarProps) {
-  const [localLimit,  setLocalLimit]  = useState(limit);
+  const [localLimit, setLocalLimit] = useState(limit);
   const [localMinSim, setLocalMinSim] = useState(minSim);
 
   const inputStyle: React.CSSProperties = {
@@ -340,15 +340,15 @@ function TopBar({ limit, minSim, loading, searchQuery, data, onApply, onSearch, 
 
   return (
     <div style={{
-      display:        "flex",
-      alignItems:     "center",
-      gap:            16,
-      padding:        "10px 20px",
-      borderBottom:   "1px solid rgba(255,255,255,0.05)",
-      background:     "rgba(2,8,17,0.92)",
+      display: "flex",
+      alignItems: "center",
+      gap: 16,
+      padding: "10px 20px",
+      borderBottom: "1px solid rgba(255,255,255,0.05)",
+      background: "rgba(2,8,17,0.92)",
       backdropFilter: "blur(16px)",
-      zIndex:         100,
-      flexShrink:     0,
+      zIndex: 100,
+      flexShrink: 0,
     }}>
       {/* brand */}
       <span style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#22d3ee", letterSpacing: "0.14em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
@@ -417,15 +417,15 @@ function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const GraphPage: React.FC = () => {
-  const [limit,       setLimit]       = useState(50);
-  const [minSim,      setMinSim]      = useState(0);
+  const [limit, setLimit] = useState(50);
+  const [minSim, setMinSim] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [data,    setData]    = useState<GraphData | null>(null);
+  const [data, setData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [selectedId,   setSelectedId]   = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<SelectedEdgeState | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -491,7 +491,12 @@ const GraphPage: React.FC = () => {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#020811", color: "#fff", overflow: "hidden" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: "column",
+      height: "100vh",
+      paddingTop: "64px" // height of navbar
+    }}>
 
       <TopBar
         limit={limit}

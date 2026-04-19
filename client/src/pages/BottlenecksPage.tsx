@@ -102,7 +102,7 @@ const SeverityBar: React.FC<SeverityBarProps> = ({ color, height, label }) => (
 
 const BottlenecksPage: React.FC = () => {
   return (
-    <main className="lg:ml-64 pt-24 px-12 pb-12 min-h-screen">
+    <main className=" pt-24 px-12 pb-12 min-h-screen">
       {/* Header */}
       <header className="mb-12 max-w-4xl">
         <h1 className="text-5xl font-bold font-headline text-blue-400 tracking-tight leading-none mb-4">

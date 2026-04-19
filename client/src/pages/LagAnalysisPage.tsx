@@ -211,7 +211,7 @@ const LagAnalysisPage: React.FC = () => {
   /* ---------------- UI ---------------- */
 
   return (
-    <main className="lg:pl-64 pt-24 pb-12 px-8 lg:px-20 min-h-screen">
+    <main className="pt-24 pb-12 px-8 lg:px-20 min-h-screen">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <header className="mb-12">

@@ -7,6 +7,7 @@ import os
 from fastapi.middleware.cors import CORSMiddleware
 from GraphRepresentation.routes import router as graph_router
 from GraphCreation.routes import graph_create_router
+from auth import routes as auth_router
 
 app = FastAPI()
 app.include_router(gap_router, prefix='/api')
@@ -15,6 +16,7 @@ app.include_router(summary_router, prefix='/api')
 app.include_router(temporal_router, prefix='/api')
 app.include_router(graph_router)
 app.include_router(graph_create_router, prefix='/api')
+app.include_router(auth_router)
 
 @app.get("/")
 async def health():

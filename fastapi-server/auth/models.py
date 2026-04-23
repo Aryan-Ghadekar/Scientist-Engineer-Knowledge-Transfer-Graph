@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, validator, Field
+from pydantic import BaseModel, EmailStr, field_validator, Field, model_validator
 
 
 # ─────────────────────────────────────────────
@@ -39,13 +39,15 @@ class SignupRequest(BaseModel):
     organization: Optional[str] = Field(None, max_length=250)
     department:   Optional[str] = Field(None, max_length=250)
 
-    @validator("username")
+    @field_validator("username")          # Pydantic V2: field_validator replaces validator
+    @classmethod
     def validate_username(cls, v: str) -> str:
         if not re.match(r"^[a-zA-Z0-9_]+$", v):
             raise ValueError("Username may only contain letters, numbers, and underscores.")
         return v.lower()
 
-    @validator("password")
+    @field_validator("password")
+    @classmethod
     def validate_password(cls, v: str) -> str:
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter.")
@@ -53,8 +55,8 @@ class SignupRequest(BaseModel):
             raise ValueError("Password must contain at least one digit.")
         return v
 
-    class Config:
-        schema_extra = {
+    model_config = {                      # Pydantic V2: model_config dict replaces class Config
+        "json_schema_extra": {            # renamed from schema_extra
             "example": {
                 "email": "ada@university.edu",
                 "password": "Secure123",
@@ -65,19 +67,21 @@ class SignupRequest(BaseModel):
                 "department": "Machine Learning",
             }
         }
+    }
 
 
 class LoginRequest(BaseModel):
     email:    EmailStr
     password: str
 
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "email": "ada@university.edu",
                 "password": "Secure123",
             }
         }
+    }
 
 
 class RefreshRequest(BaseModel):
@@ -121,8 +125,9 @@ class UserProfile(BaseModel):
     is_verified:  bool
     created_at:   datetime
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True           # Pydantic V2: renamed from orm_mode
+    }
 
 
 class AuthResponse(BaseModel):

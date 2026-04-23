@@ -59,3 +59,4 @@ fastapi-server/config/__pycache__
 fastapi-server/routes/__pycache__
 fastapi-server/services/__pycache__
 fastapi-server/.env
+__pycache__/

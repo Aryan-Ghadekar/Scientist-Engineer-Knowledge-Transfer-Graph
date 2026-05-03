@@ -92,51 +92,51 @@ const App: React.FC = () => {
           <Route
             path="/"
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <AppLayout>
                   <HomePage />
                 </AppLayout>
-              // </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/graph"
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <AppLayout>
                   <GraphPage />
                 </AppLayout>
-              // </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
           <Route
             path="/lag-analysis"
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <AppLayout>
                   <LagAnalysisPage />
                 </AppLayout>
-              // </ProtectedRoute>
+               </ProtectedRoute>
             }
           />
           <Route
             path="/bottlenecks"
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <AppLayout>
                   <BottlenecksPage />
                 </AppLayout>
-              // </ProtectedRoute>
+               </ProtectedRoute>
             }
           />
           <Route
             path="/dashboard"
             element={
-              // <ProtectedRoute>
+              <ProtectedRoute>
                 <AppLayout>
                   <DashboardPage />
                 </AppLayout>
-              // </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
 

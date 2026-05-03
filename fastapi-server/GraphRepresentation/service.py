@@ -1,4 +1,5 @@
 """
+graphrep/servic.py
 GraphService — owns all Neo4j interaction and graph-layout logic.
 
 Responsibilities:
@@ -21,7 +22,6 @@ from .models import (
     GraphData,
 )
 
-logger = logging.getLogger(__name__)
 
 
 # ── Cypher ────────────────────────────────────────────────────────────────────
@@ -110,9 +110,7 @@ class GraphService:
                 try:
                     records.append(RawGraphRecord(**dict(row)))
                 except Exception as exc:
-                    logger.warning("Skipping malformed record: %s — %s", dict(row), exc)
-
-        logger.info("Fetched %d raw records from Neo4j", len(records))
+                    pass
         return records
 
     @classmethod

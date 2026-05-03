@@ -1,73 +1,195 @@
 """
-Graph routes — thin HTTP layer.
-
-Only concerns:
-  • validate query params
-  • call GraphService
-  • return JSON
-
-Business logic lives in GraphService, data shapes in graph_models.
+auth/routes.py
+FastAPI router for all authentication endpoints.
+Mount in main.py:  app.include_router(auth_router)
 """
+from __future__ import annotations
 
 import logging
-from fastapi import APIRouter, HTTPException, Query
+import traceback
 
-from .models import GraphData
-from .service import GraphService
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-logger = logging.getLogger(__name__)
-
-router = APIRouter(prefix="/api/graph", tags=["Graph"])
-
-
-@router.get(
-    "/bipartite",
-    response_model=GraphData,
-    summary="Fetch Paper → Patent bipartite graph",
-    description=(
-        "Returns all Paper nodes, Patent nodes, and their SIMILAR_TO edges "
-        "with 3-D layout positions pre-computed for the frontend."
-    ),
+from .models import (
+    AuthResponse,
+    LoginRequest,
+    MessageResponse,
+    ProfileUpdate,
+    RefreshRequest,
+    SignupRequest,
+    TokenRefreshResponse,
+    UserProfile,
+    UsernameCheckResponse,
 )
-def get_bipartite_graph(
-    limit: int = Query(
-        default=50,
-        ge=1,
-        le=200,
-        description="Maximum number of SIMILAR_TO relationships to return.",
-    ),
-    min_similarity: float = Query(
-        default=0.0,
-        ge=0.0,
-        le=1.0,
-        description="Only include edges with similarity ≥ this threshold.",
-    ),
-) -> GraphData:
-    """
-    GET /api/graph/bipartite?limit=50&min_similarity=0.5
-    """
+from .service import auth_service
+
+
+
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+_bearer = HTTPBearer()
+
+
+# ─────────────────────────────────────────────
+# Dependency: resolve current user from JWT
+# ─────────────────────────────────────────────
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> dict:
     try:
-        data = GraphService.fetch_graph(
-            limit=limit,
-            min_similarity=min_similarity,
+        return await auth_service.verify_token(credentials.credentials)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        logger.info(
-            "Returning graph: %d papers, %d patents, %d edges",
-            data.total_papers,
-            data.total_patents,
-            data.total_edges,
-        )
-        return data
+
+
+# ─────────────────────────────────────────────
+# Public routes
+# ─────────────────────────────────────────────
+
+@router.post(
+    "/signup",
+    response_model=AuthResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new user",
+)
+async def signup(body: SignupRequest) -> AuthResponse:
+    try:
+        result = await auth_service.sign_up(body)
+        return result
+
+    except ValueError as exc:
+        # Expected business-logic errors (duplicate username, email confirmed, etc.)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     except Exception as exc:
-        logger.exception("Failed to build bipartite graph")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        # Log the FULL traceback so nothing is hidden
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Signup failed: {type(exc).__name__}: {exc}",  # expose detail in dev
+        )
+
+
+@router.post(
+    "/login",
+    response_model=AuthResponse,
+    summary="Login with email and password",
+)
+async def login(body: LoginRequest) -> AuthResponse:
+    try:
+        result = await auth_service.sign_in(body)
+        return result
+
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed: {type(exc).__name__}: {exc}",
+        )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenRefreshResponse,
+    summary="Refresh access token",
+)
+async def refresh_token(body: RefreshRequest) -> TokenRefreshResponse:
+    try:
+        return await auth_service.refresh_tokens(body.refresh_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Token refresh failed: {type(exc).__name__}: {exc}",
+        )
 
 
 @router.get(
-    "/health",
-    summary="Health-check for the graph service",
+    "/check-username/{username}",
+    response_model=UsernameCheckResponse,
+    summary="Check if a username is available",
 )
-def health_check():
-    """Quick ping to confirm the route is registered and reachable."""
-    return {"status": "ok", "service": "graph-representation"}
+async def check_username(username: str) -> UsernameCheckResponse:
+    try:
+        available = await auth_service.is_username_available(username)
+        return UsernameCheckResponse(username=username, available=available)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Username check failed: {type(exc).__name__}: {exc}",
+        )
+
+
+# ─────────────────────────────────────────────
+# Protected routes (require Bearer token)
+# ─────────────────────────────────────────────
+
+@router.post(
+    "/logout",
+    response_model=MessageResponse,
+    summary="Logout current user",
+)
+async def logout(_: dict = Depends(get_current_user)) -> MessageResponse:
+    await auth_service.sign_out()
+    return MessageResponse(message="Logged out successfully.")
+
+
+@router.get(
+    "/me",
+    response_model=UserProfile,
+    summary="Get the current user's profile",
+)
+async def get_me(current_user: dict = Depends(get_current_user)) -> UserProfile:
+    try:
+        return await auth_service.get_profile_by_id(current_user["user_id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch profile: {type(exc).__name__}: {exc}",
+        )
+
+
+@router.patch(
+    "/me",
+    response_model=UserProfile,
+    summary="Update the current user's profile",
+)
+async def update_me(
+    body: ProfileUpdate,
+    current_user: dict = Depends(get_current_user),
+) -> UserProfile:
+    try:
+        return await auth_service.update_profile(current_user["user_id"], body)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Profile update failed: {type(exc).__name__}: {exc}",
+        )
+
+
+@router.get(
+    "/users/{username}",
+    response_model=UserProfile,
+    summary="Get a public profile by username",
+)
+async def get_user_profile(username: str) -> UserProfile:
+    try:
+        return await auth_service.get_profile_by_username(username)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch user: {type(exc).__name__}: {exc}",
+        )

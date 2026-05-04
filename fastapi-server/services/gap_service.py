@@ -79,3 +79,38 @@ def get_domainwise_analysis(data):
         }
         for k, v in domains.items()
     }
+
+
+import heapq
+
+def rank_papers(papers):
+    heap = []
+
+    for p in papers:
+        # ✅ ensure numeric conversion (fix your previous error also)
+        novelty = float(p.get("novelty", 0))
+        cited = float(p.get("cited", 0))
+        probability = float(p.get("prediction", {}).get("probability", 0))
+
+        # ✅ compute priority
+        priority = (
+            -(novelty * 0.5 + cited * 0.3 + probability * 0.2)
+        )
+
+        heapq.heappush(heap, (priority, p))
+
+    ranked = []
+    rank = 1
+
+    while heap:
+        priority, paper = heapq.heappop(heap)
+
+        ranked.append({
+            "rank": rank,
+            "priority_score": round(-priority, 4),  # convert back to positive
+            "paper": paper
+        })
+
+        rank += 1
+
+    return ranked

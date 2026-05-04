@@ -19,6 +19,8 @@ import LagFilterPanel from "../components/LagAnalysis/LagFilterPanel";
 import Pagination from "../components/LagAnalysis/Pagination";
 import TableState from "../components/LagAnalysis/TableState";
 import TableSkeleton from "../components/LagAnalysis/TableSkeleton";
+import RankedPapersPage from "./RankedLagAnalysis";
+import RankedPapersTable from "../components/LagAnalysis/RankedTable";
 
 
 /* ---------------- TYPES ---------------- */
@@ -158,6 +160,7 @@ const LagAnalysisPage: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [type, setType] = useState<"lag" | "ranked">("lag");;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -272,7 +275,36 @@ const LagAnalysisPage: React.FC = () => {
 
   return (
     <main className="pt-24 pb-12 px-8 lg:px-20 min-h-screen">
-      <div className="max-w-7xl mx-auto">
+      <div className="flex justify-center mb-8">
+        <div className="relative flex bg-surface-container-high rounded-full p-1 w-64">
+
+          {/* Slider background */}
+          <div
+            className={`absolute top-1 bottom-1 w-1/2 rounded-full bg-primary transition-all duration-300
+        ${type === "lag" ? "left-1" : "left-1/2"}`}
+          />
+
+          {/* Lag Button */}
+          <button
+            onClick={() => setType("lag")}
+            className={`relative z-10 w-1/2 py-2 text-sm font-semibold transition-colors
+        ${type === "lag" ? "text-white" : "text-on-surface-variant"}`}
+          >
+            Lag Analysis
+          </button>
+
+          {/* Ranked Button */}
+          <button
+            onClick={() => setType("ranked")}
+            className={`relative z-10 w-1/2 py-2 text-sm font-semibold transition-colors
+        ${type === "ranked" ? "text-white" : "text-on-surface-variant"}`}
+          >
+            Ranked Papers
+          </button>
+
+        </div>
+      </div>
+      {type == "lag" ? (<div className="max-w-7xl mx-auto">
         {/* Header */}
         <header className="mb-12">
           <h1 className="text-4xl md:text-5xl font-bold font-headline text-primary-container tracking-tight mb-2">
@@ -448,7 +480,9 @@ const LagAnalysisPage: React.FC = () => {
             />
           </div>
         </section>
-      </div>
+      </div>)
+        : <RankedPapersTable />
+      }
     </main>
   );
 };

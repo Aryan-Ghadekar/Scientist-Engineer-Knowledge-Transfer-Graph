@@ -87,12 +87,10 @@ def rank_papers(papers):
     heap = []
 
     for p in papers:
-        # ✅ ensure numeric conversion (fix your previous error also)
         novelty = float(p.get("novelty", 0))
         cited = float(p.get("cited", 0))
         probability = float(p.get("prediction", {}).get("probability", 0))
 
-        # ✅ compute priority
         priority = (
             -(novelty * 0.5 + cited * 0.3 + probability * 0.2)
         )

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from services.graph_service import get_papers_with_patents
-from services.gap_service import detect_gap, get_top_papers, get_domainwise_analysis
+from services.gap_service import detect_gap, get_top_papers, get_domainwise_analysis, rank_papers
 
 gap_router = APIRouter()
 
@@ -22,3 +22,12 @@ def get_domain_analysis():
     raw = get_papers_with_patents()
     processed = [detect_gap(p) for p in raw]
     return get_domainwise_analysis(processed)
+
+@gap_router.get("/priority-ranked")
+def get_ranked_papers():
+    data = get_papers_with_patents()
+    rankked_data = rank_papers(data)
+    return {
+        "total": len(rankked_data),
+        "data": rankked_data
+    }

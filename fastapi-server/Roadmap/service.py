@@ -1,6 +1,7 @@
 from config.db import get_session
 from auth.service import supabase_admin as supabase
 from services.groq_service import client
+import re
 
 def get_graph_context(title):
     query = """
@@ -42,106 +43,175 @@ def get_graph_context(title):
 
 #     return response.choices[0].message.content
 
+# def generate_roadmap(paper):
+#     """
+#     Converts a research paper into a structured, deployment-oriented roadmap.
+#     """
+
+#     # 1. Get graph / external context (must be meaningful)
+#     context = get_graph_context(paper.title)
+
+#     # 2. Basic paper parsing (lightweight fallback if full parser not built)
+#     paper_info = {
+#         "title": paper.title,
+#         "abstract": paper.abstract[:1500]  # avoid token overflow
+#     }
+
+#     # 3. Simple feasibility heuristics (placeholder — improve later)
+#     feasibility_hint = {
+#         "data_availability": "unknown",
+#         "compute_requirement": "unknown",
+#         "real_time_feasibility": "unknown"
+#     }
+
+#     # 4. Strong, constraint-driven prompt
+#     prompt = f"""
+# You are a senior AI product engineer, not a researcher.
+
+# Your task is to convert a research paper into a REALISTIC product roadmap.
+
+# Be brutally honest. Avoid generic statements.
+
+# =====================
+# PAPER
+# Title: {paper_info['title']}
+# Abstract: {paper_info['abstract']}
+
+# GRAPH CONTEXT (existing work / similar ideas):
+# {context}
+
+# INITIAL FEASIBILITY HINT:
+# {feasibility_hint}
+
+# =====================
+# OUTPUT FORMAT (STRICT JSON):
+
+# {{
+#   "product_summary": {{
+#     "idea": "...",
+#     "target_users": "...",
+#     "problem_solved": "..."
+#   }},
+#   "mvp_plan": {{
+#     "core_features": ["..."],
+#     "architecture": "...",
+#     "tech_stack": ["..."],
+#     "api_design": "..."
+#   }},
+#   "data_requirements": {{
+#     "type": "...",
+#     "availability": "easy / moderate / hard",
+#     "collection_strategy": "..."
+#   }},
+#   "deployment_plan": {{
+#     "mode": "cloud / edge / hybrid",
+#     "infra": "...",
+#     "latency_constraints": "..."
+#   }},
+#   "technical_improvements": ["..."],
+#   "industry_applications": ["..."],
+#   "risks_and_gaps": {{
+#     "technical": ["..."],
+#     "business": ["..."]
+#   }},
+#   "feasibility": {{
+#     "score": 1-10,
+#     "justification": "...",
+#     "what_to_simplify": "...",
+#     "what_is_unrealistic": "..."
+#   }}
+# }}
+
+# =====================
+# RULES:
+
+# - Do NOT assume unlimited data or compute
+# - If paper is not deployable → clearly say it
+# - Prefer simple architectures over complex ones
+# - Avoid buzzwords
+# - Be specific (models, APIs, infra)
+# - Keep it implementable by a small team (2–5 engineers)
+
+# Return ONLY JSON. No explanation.
+# """
+
+#     # 5. LLM call
+#     response = client.chat.completions.create(
+#         model="llama-3.3-70b-versatile",
+#         messages=[{"role": "user", "content": prompt}],
+#         temperature=0.3  # reduce randomness
+#     )
+
+#     return response.choices[0].message.content
+
 def generate_roadmap(paper):
     """
-    Converts a research paper into a structured, deployment-oriented roadmap.
+    Returns HUMAN-READABLE STEP-BY-STEP ROADMAP (frontend-friendly text)
     """
 
-    # 1. Get graph / external context (must be meaningful)
     context = get_graph_context(paper.title)
 
-    # 2. Basic paper parsing (lightweight fallback if full parser not built)
+    context_str = "\n".join(
+        [f"- {c.get('label')} ({c.get('prob')})" for c in context]
+    ) if context else "No prior context found"
+
     paper_info = {
         "title": paper.title,
-        "abstract": paper.abstract[:1500]  # avoid token overflow
+        "abstract": (paper.abstract or "")[:800]
     }
 
-    # 3. Simple feasibility heuristics (placeholder — improve later)
-    feasibility_hint = {
-        "data_availability": "unknown",
-        "compute_requirement": "unknown",
-        "real_time_feasibility": "unknown"
-    }
-
-    # 4. Strong, constraint-driven prompt
     prompt = f"""
-You are a senior AI product engineer, not a researcher.
+You are a senior AI product engineer.
 
-Your task is to convert a research paper into a REALISTIC product roadmap.
+Convert this paper into a REALISTIC step-by-step product roadmap.
 
-Be brutally honest. Avoid generic statements.
-
-=====================
-PAPER
-Title: {paper_info['title']}
-Abstract: {paper_info['abstract']}
-
-GRAPH CONTEXT (existing work / similar ideas):
-{context}
-
-INITIAL FEASIBILITY HINT:
-{feasibility_hint}
-
-=====================
-OUTPUT FORMAT (STRICT JSON):
-
-{{
-  "product_summary": {{
-    "idea": "...",
-    "target_users": "...",
-    "problem_solved": "..."
-  }},
-  "mvp_plan": {{
-    "core_features": ["..."],
-    "architecture": "...",
-    "tech_stack": ["..."],
-    "api_design": "..."
-  }},
-  "data_requirements": {{
-    "type": "...",
-    "availability": "easy / moderate / hard",
-    "collection_strategy": "..."
-  }},
-  "deployment_plan": {{
-    "mode": "cloud / edge / hybrid",
-    "infra": "...",
-    "latency_constraints": "..."
-  }},
-  "technical_improvements": ["..."],
-  "industry_applications": ["..."],
-  "risks_and_gaps": {{
-    "technical": ["..."],
-    "business": ["..."]
-  }},
-  "feasibility": {{
-    "score": 1-10,
-    "justification": "...",
-    "what_to_simplify": "...",
-    "what_is_unrealistic": "..."
-  }}
-}}
-
-=====================
 RULES:
-
+- Be practical, not theoretical
+- Keep steps implementable by small team
+- Avoid fluff
+- Use numbered steps
 - Do NOT assume unlimited data or compute
 - If paper is not deployable → clearly say it
 - Prefer simple architectures over complex ones
 - Avoid buzzwords
 - Be specific (models, APIs, infra)
-- Keep it implementable by a small team (2–5 engineers)
 
-Return ONLY JSON. No explanation.
+OUTPUT FORMAT:
+
+Step 1: ...
+Step 2: ...
+Step 3: ...
+
+Include:
+- MVP building steps
+- data handling
+- deployment
+- risks
+- simplifications
+
+PAPER:
+{paper_info['title']}
+{paper_info['abstract']}
+
+CONTEXT:
+{context_str}
 """
 
-    # 5. LLM call
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3  # reduce randomness
-    )
+    def call_llm():
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
+        )
+        return response.choices[0].message.content
 
-    return response.choices[0].message.content
+    raw_output = call_llm()
+
+    # 🔹 Clean output (remove weird formatting)
+    cleaned = re.sub(r"```.*?```", "", raw_output, flags=re.DOTALL)
+    cleaned = cleaned.replace("•", "").strip()
+
+    return cleaned
 
 def store_in_supabase(paper, prediction):
     supabase.table("papers").insert({

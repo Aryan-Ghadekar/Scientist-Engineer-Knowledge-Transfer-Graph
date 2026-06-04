@@ -12,6 +12,7 @@ from PatentAPI.routes import patent_router
 from PatentAPI.service import lifespan
 from Roadmap.routes import roadmap_router
 from dashboarddata.routes import router as dashstats_router
+from paper_review import router as paper_review_router
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(gap_router, prefix='/api')
@@ -24,6 +25,7 @@ app.include_router(auth_router)
 app.include_router(patent_router)
 app.include_router(roadmap_router)
 app.include_router(dashstats_router)
+app.include_router(paper_review_router)
 
 @app.get("/")
 async def health():

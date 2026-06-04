@@ -7,19 +7,20 @@ import TopNavBar from "./components/layout/TopNavBar";
 import MobileBottomNav from "./components/layout/MobileBottomNav";
 
 // Pages
-import HomePage         from "./pages/HomePage";
-import GraphPage        from "./pages/GraphPage";
-import LagAnalysisPage  from "./pages/LagAnalysisPage";
-import BottlenecksPage  from "./pages/BottlenecksPage";
-import DashboardPage    from "./pages/DashboardPage";
+import HomePage from "./pages/HomePage";
+import GraphPage from "./pages/GraphPage";
+import LagAnalysisPage from "./pages/LagAnalysisPage";
+import BottlenecksPage from "./pages/BottlenecksPage";
+import DashboardPage from "./pages/DashboardPage";
 
 // Auth pages
-import LoginPage  from "./pages/Loginpage";
+import LoginPage from "./pages/Loginpage";
 import SignupPage from "./pages/Signuppage";
 
 // Auth guards & context
-import { AuthProvider }              from "./components/auth/Authcontext";
+import { AuthProvider } from "./components/auth/Authcontext";
 import { ProtectedRoute, PublicRoute } from "./components/auth/Protectedroute";
+import PaperReviewPage from "./pages/PaperReviewPage";
 
 // ─────────────────────────────────────────────
 // Layout wrapper — shared chrome for app pages
@@ -85,7 +86,7 @@ const App: React.FC = () => {
           />
 
           {/* Convenience redirect: /login → /auth/login */}
-          <Route path="/login"  element={<Navigate to="/auth/login"  replace />} />
+          <Route path="/login" element={<Navigate to="/auth/login" replace />} />
           <Route path="/signup" element={<Navigate to="/auth/signup" replace />} />
 
           {/* ── Protected app routes ── */}
@@ -116,7 +117,7 @@ const App: React.FC = () => {
                 <AppLayout>
                   <LagAnalysisPage />
                 </AppLayout>
-               </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
           <Route
@@ -126,7 +127,7 @@ const App: React.FC = () => {
                 <AppLayout>
                   <BottlenecksPage />
                 </AppLayout>
-               </ProtectedRoute>
+              </ProtectedRoute>
             }
           />
           <Route
@@ -135,6 +136,16 @@ const App: React.FC = () => {
               <ProtectedRoute>
                 <AppLayout>
                   <DashboardPage />
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/paper-review"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <PaperReviewPage />
                 </AppLayout>
               </ProtectedRoute>
             }

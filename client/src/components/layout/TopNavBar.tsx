@@ -195,6 +195,7 @@ const TopNavBar: React.FC = () => {
             <Link to="/lag-analysis" className={getLinkClass("/lag-analysis")}>Lag Analysis</Link>
             <Link to="/bottlenecks"  className={getLinkClass("/bottlenecks")}>Bottlenecks</Link>
             <Link to="/dashboard"    className={getLinkClass("/dashboard")}>Dashboard</Link>
+            <Link to="/paper-review"       className={getLinkClass("/paper-review")}>Plagiarism Detection</Link>
           </div>
         )}
       </div>

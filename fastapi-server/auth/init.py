@@ -6,6 +6,7 @@ Usage in main.py:
     from auth import router as auth_router
     app.include_router(auth_router)
 """
+
 from .routes import router
 from .service import auth_service
 from .models import (

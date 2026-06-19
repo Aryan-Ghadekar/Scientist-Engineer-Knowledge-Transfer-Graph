@@ -1,8 +1,9 @@
 from config.db import get_session
-from services.groq_service import client
+from services.ai_service import client
 import re
 from config.postgres_db import SessionLocal
 from .models import Paper
+
 
 def get_graph_context(title):
     query = """
@@ -15,6 +16,7 @@ def get_graph_context(title):
         result = session.run(query, {"title": title})
         return [dict(r) for r in result]
 
+
 def generate_roadmap(paper):
     """
     Returns HUMAN-READABLE STEP-BY-STEP ROADMAP (frontend-friendly text)
@@ -22,14 +24,13 @@ def generate_roadmap(paper):
 
     context = get_graph_context(paper.title)
 
-    context_str = "\n".join(
-        [f"- {c.get('label')} ({c.get('prob')})" for c in context]
-    ) if context else "No prior context found"
+    context_str = (
+        "\n".join([f"- {c.get('label')} ({c.get('prob')})" for c in context])
+        if context
+        else "No prior context found"
+    )
 
-    paper_info = {
-        "title": paper.title,
-        "abstract": (paper.abstract or "")[:800]
-    }
+    paper_info = {"title": paper.title, "abstract": (paper.abstract or "")[:800]}
 
     prompt = f"""
 You are a senior AI product engineer.
@@ -70,9 +71,9 @@ CONTEXT:
 
     def call_llm():
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3
+            temperature=0.3,
         )
         return response.choices[0].message.content
 
@@ -84,7 +85,9 @@ CONTEXT:
 
     return cleaned
 
+
 from config.db import get_session
+
 
 def save_and_link_paper(paper, prediction):
     """
@@ -96,7 +99,8 @@ def save_and_link_paper(paper, prediction):
     with get_session() as session:
 
         # 🔹 Save paper + prediction
-        session.run("""
+        session.run(
+            """
         MERGE (p:Paper {title: $title})
         SET p.abstract = $abstract,
             p.year = $year,
@@ -109,45 +113,56 @@ def save_and_link_paper(paper, prediction):
 
         MERGE (p)-[:PREDICTED_AS]->(pred)
         """,
-        title=paper.get("title"),
-        abstract=paper.get("abstract"),
-        year=paper.get("year"),
-        novelty=paper.get("novelty", 0),
-        probability=prediction["probability"],
-        label=prediction["label"],
-        confidence=prediction["confidence"]
+            title=paper.get("title"),
+            abstract=paper.get("abstract"),
+            year=paper.get("year"),
+            novelty=paper.get("novelty", 0),
+            probability=prediction["probability"],
+            label=prediction["label"],
+            confidence=prediction["confidence"],
         )
 
         # 🔹 Link with similar existing papers (basic matching)
-        session.run("""
+        session.run(
+            """
         MATCH (new:Paper {title: $title}), (p:Paper)
         WHERE new <> p 
         AND toLower(p.title) CONTAINS toLower($title)
 
         MERGE (new)-[:SIMILAR_TO {score: 0.7}]->(p)
-        """, {"title": paper.get("title")})
+        """,
+            {"title": paper.get("title")},
+        )
 
         # 🔹 Link to patents (if related exist)
-        session.run("""
+        session.run(
+            """
         MATCH (p:Paper {title: $title}), (pt:Patent)
         WHERE toLower(pt.title) CONTAINS toLower($title)
 
         MERGE (p)-[:SIMILAR_TO {score: 0.6}]->(pt)
-        """, {"title": paper.get("title")})
+        """,
+            {"title": paper.get("title")},
+        )
+
 
 def get_matches(title: str):
     with get_session() as session:
-        result = session.run("""
+        result = session.run(
+            """
         MATCH (p:Paper {title: $title})-[r:SIMILAR_TO]->(n)
         RETURN 
             labels(n)[0] AS type,
             n.title AS title,
             r.score AS score
         LIMIT 5
-        """, {"title": title})
+        """,
+            {"title": title},
+        )
 
         return [dict(record) for record in result]
-    
+
+
 def store_in_postgres(paper, prediction):
 
     db = SessionLocal()
@@ -160,7 +175,7 @@ def store_in_postgres(paper, prediction):
             novelty=paper.novelty,
             prediction=prediction["label"],
             probability=prediction["probability"],
-            confidence=prediction["confidence"]
+            confidence=prediction["confidence"],
         )
 
         db.add(db_paper)

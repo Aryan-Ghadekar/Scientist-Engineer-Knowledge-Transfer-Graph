@@ -3,12 +3,10 @@
 <h1 align="center">Scientist-Engineer-Knowledge-Transfer-Graph</h1>
 
 <p align="center">
-  <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white"/></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react&logoColor=black"/></a>
   <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white"/></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white"/></a>
-  <a href="https://openjdk.org/"><img src="https://img.shields.io/badge/Java-17+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white"/></a>
-  <a href="https://maven.apache.org/"><img src="https://img.shields.io/badge/Maven-3.x-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white"/></a>
+  <a href="https://python.org"><img src="https://shields.io"/><img src="https://img.shields.io/pypi/pyversions/:packageName?style=for-the-badge&logo=python&logoColor=white"/></a>
 </p>
 
 <p align="center">
@@ -79,11 +77,6 @@ Scientist-Engineer-Knowledge-Transfer-Graph/
 │   ├── package.json
 │   └── vite.config.ts
 │
-├── 📂 server/                          # Spring Boot backend
-│   ├── src/
-│   │   └── main/java/...
-│   ├── pom.xml
-│   └── application.properties
 ├── 📂 fastapi-server/                          # FastAPI backend
 │   ├── routes/
 │   ├── services/
@@ -100,8 +93,6 @@ Before running this project, ensure you have the following installed:
 
 | Tool | Version | Purpose |
 |------|---------|---------|
-| ☕ Java | 17+ | Spring Boot runtime |
-| 🔨 Maven | 3.x | Backend build tool |
 | 🟢 Node.js | 18+ | Frontend runtime |
 | 📦 npm | 9+ | Package manager |
 | 🐙 Git | Latest | Version control |
@@ -111,37 +102,6 @@ Before running this project, ensure you have the following installed:
 - 🧩 **VS Code** or **IntelliJ IDEA** as your IDE
 - 🔍 **React DevTools** browser extension
 - 📮 **Postman** for testing REST APIs
-
----
-
-## ⚙️ Backend Setup (Spring Boot)
-
-### 1. Navigate to the server folder
-
-```bash
-cd server
-```
-
-### 2. Build the project
-
-```bash
-# Using Maven
-mvn clean install
-```
-
-### 3. Run the Spring Boot server
-
-```bash
-mvn spring-boot:run
-```
-
-> ✅ Server starts at → **http://localhost:8080**
-
-### 4. Verify it's running
-
-Open `http://localhost:8080` in your browser — you should see a JSON response or the API root message.
-
----
 
 ## 🐍 Python Backend Setup (FastAPI + uv)
 
@@ -188,8 +148,6 @@ Open `http://localhost:8000` in your browser — you should see a JSON response 
 ```bash
 Frontend (React - 5173)
         │
-        ├── Spring Boot (8080)
-        │
         └── FastAPI (8000)  ← Temporal + AI Analysis
 ```
 
@@ -224,8 +182,8 @@ Always start the **backend first**, then the **frontend**:
 
 ```bash
 # Terminal 1 — Start backend
-cd server
-mvn spring-boot:run
+cd fastapi-server
+fastapi dev
 
 # Terminal 2 — Start frontend
 cd client
@@ -238,39 +196,12 @@ Browser → http://localhost:5173
              └──── API calls ──── http://localhost:8080
 ```
 
----
-
-## 📁 Git Best Practices
-
-Add a `.gitignore` to avoid committing build artifacts:
-
-```gitignore
-# ── Spring Boot ──
-/server/target/
-/server/.idea/
-/server/*.log
-
-# ── React / Vite ──
-/client/node_modules/
-/client/dist/
-/client/.env
-/client/.env.local
-```
-
-**Normalize line endings on Windows:**
-
-```bash
-git config --global core.autocrlf true
-```
-
----
-
 ## 🔧 Useful Commands
 
 | Command | Location | Description |
 |---------|----------|-------------|
-| `mvn clean install` | `/server` | Build Spring Boot project |
-| `mvn spring-boot:run` | `/server` | Run Spring Boot server |
+| `uv pip install -r requirements.txt` | `/fastapi-server` | Install requirements |
+| `fastapi dev` | `/fastapi-server` | Run FastAPI server |
 | `npm install` | `/client` | Install frontend dependencies |
 | `npm run dev` | `/client` | Start React + Vite dev server |
 | `npm run build` | `/client` | Build frontend for production |

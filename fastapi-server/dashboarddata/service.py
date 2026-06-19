@@ -191,8 +191,7 @@ class DashboardService:
             conf = str(p.confidence or "").lower()
             prob = p.probability or 1.0
             title = p.title or "Untitled Paper"
-            created = p.get("created_at", "")
-            time_str = _relative_time(created)
+            time_str = _relative_time(p.created_at)
 
             if prob < 0.4:
                 items.append(ActivityItem(

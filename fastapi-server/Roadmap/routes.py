@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from PatentAPI.service import _run_inference
 from .service import save_and_link_paper, get_matches
-from .models import PipelineInput
-from .service import generate_roadmap, store_in_supabase
+from .schemas import PipelineInput
+from .service import generate_roadmap, store_in_postgres
 import time
 
 roadmap_router = APIRouter(prefix="/api/pipeline", tags=["Roadmap"])
@@ -18,7 +18,7 @@ def analyze_pipeline(paper: dict):
     prediction = _run_inference(paper_obj)
 
     # 2. Save to DB
-    store_in_supabase(paper_obj, prediction)
+    store_in_postgres(paper_obj, prediction)
 
     # 3. Save to Neo4j
     # save_and_link_paper(paper, prediction)

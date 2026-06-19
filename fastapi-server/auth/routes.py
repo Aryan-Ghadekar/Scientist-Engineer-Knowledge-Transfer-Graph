@@ -11,7 +11,7 @@ import traceback
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .models import (
+from .schemas import (
     AuthResponse,
     LoginRequest,
     MessageResponse,

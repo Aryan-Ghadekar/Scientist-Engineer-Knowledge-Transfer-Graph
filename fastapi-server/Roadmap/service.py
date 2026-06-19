@@ -1,7 +1,8 @@
 from config.db import get_session
-from auth.service import supabase_admin as supabase
 from services.groq_service import client
 import re
+from config.postgres_db import SessionLocal
+from .models import Paper
 
 def get_graph_context(title):
     query = """
@@ -13,136 +14,6 @@ def get_graph_context(title):
     with get_session() as session:
         result = session.run(query, {"title": title})
         return [dict(r) for r in result]
-
-# def generate_roadmap(paper):
-#     context = get_graph_context(paper.title)
-
-#     prompt = f"""
-#     You are an innovation strategist.
-
-#     Paper:
-#     {paper.title}
-
-#     Abstract:
-#     {paper.abstract}
-
-#     Graph insights:
-#     {context}
-
-#     Generate:
-#     1. Steps to convert into patent
-#     2. Technical improvements
-#     3. Industry applications
-#     4. Risks & gaps
-#     """
-
-#     response = client.chat.completions.create(
-#     model="llama-3.3-70b-versatile",   # ✅ updated
-#     messages=[{"role": "user", "content": prompt}]
-#     )
-
-#     return response.choices[0].message.content
-
-# def generate_roadmap(paper):
-#     """
-#     Converts a research paper into a structured, deployment-oriented roadmap.
-#     """
-
-#     # 1. Get graph / external context (must be meaningful)
-#     context = get_graph_context(paper.title)
-
-#     # 2. Basic paper parsing (lightweight fallback if full parser not built)
-#     paper_info = {
-#         "title": paper.title,
-#         "abstract": paper.abstract[:1500]  # avoid token overflow
-#     }
-
-#     # 3. Simple feasibility heuristics (placeholder — improve later)
-#     feasibility_hint = {
-#         "data_availability": "unknown",
-#         "compute_requirement": "unknown",
-#         "real_time_feasibility": "unknown"
-#     }
-
-#     # 4. Strong, constraint-driven prompt
-#     prompt = f"""
-# You are a senior AI product engineer, not a researcher.
-
-# Your task is to convert a research paper into a REALISTIC product roadmap.
-
-# Be brutally honest. Avoid generic statements.
-
-# =====================
-# PAPER
-# Title: {paper_info['title']}
-# Abstract: {paper_info['abstract']}
-
-# GRAPH CONTEXT (existing work / similar ideas):
-# {context}
-
-# INITIAL FEASIBILITY HINT:
-# {feasibility_hint}
-
-# =====================
-# OUTPUT FORMAT (STRICT JSON):
-
-# {{
-#   "product_summary": {{
-#     "idea": "...",
-#     "target_users": "...",
-#     "problem_solved": "..."
-#   }},
-#   "mvp_plan": {{
-#     "core_features": ["..."],
-#     "architecture": "...",
-#     "tech_stack": ["..."],
-#     "api_design": "..."
-#   }},
-#   "data_requirements": {{
-#     "type": "...",
-#     "availability": "easy / moderate / hard",
-#     "collection_strategy": "..."
-#   }},
-#   "deployment_plan": {{
-#     "mode": "cloud / edge / hybrid",
-#     "infra": "...",
-#     "latency_constraints": "..."
-#   }},
-#   "technical_improvements": ["..."],
-#   "industry_applications": ["..."],
-#   "risks_and_gaps": {{
-#     "technical": ["..."],
-#     "business": ["..."]
-#   }},
-#   "feasibility": {{
-#     "score": 1-10,
-#     "justification": "...",
-#     "what_to_simplify": "...",
-#     "what_is_unrealistic": "..."
-#   }}
-# }}
-
-# =====================
-# RULES:
-
-# - Do NOT assume unlimited data or compute
-# - If paper is not deployable → clearly say it
-# - Prefer simple architectures over complex ones
-# - Avoid buzzwords
-# - Be specific (models, APIs, infra)
-# - Keep it implementable by a small team (2–5 engineers)
-
-# Return ONLY JSON. No explanation.
-# """
-
-#     # 5. LLM call
-#     response = client.chat.completions.create(
-#         model="llama-3.3-70b-versatile",
-#         messages=[{"role": "user", "content": prompt}],
-#         temperature=0.3  # reduce randomness
-#     )
-
-#     return response.choices[0].message.content
 
 def generate_roadmap(paper):
     """
@@ -213,16 +84,6 @@ CONTEXT:
 
     return cleaned
 
-def store_in_supabase(paper, prediction):
-    supabase.table("papers").insert({
-        "title": paper.title,
-        "abstract": paper.abstract,
-        "year": paper.year,
-        "prediction": prediction["label"],
-        "probability": prediction["probability"]
-    }).execute()
-
-
 from config.db import get_session
 
 def save_and_link_paper(paper, prediction):
@@ -287,13 +148,26 @@ def get_matches(title: str):
 
         return [dict(record) for record in result]
     
-def store_in_supabase(paper, prediction):
-    supabase.table("papers").insert({
-        "title": paper.title,
-        "abstract": paper.abstract,
-        "year": paper.year,
-        "novelty": paper.novelty,
-        "prediction": prediction["label"],
-        "probability": prediction["probability"],
-        "confidence": prediction["confidence"]
-    }).execute()
+def store_in_postgres(paper, prediction):
+
+    db = SessionLocal()
+
+    try:
+        db_paper = Paper(
+            title=paper.title,
+            abstract=paper.abstract,
+            year=paper.year,
+            novelty=paper.novelty,
+            prediction=prediction["label"],
+            probability=prediction["probability"],
+            confidence=prediction["confidence"]
+        )
+
+        db.add(db_paper)
+        db.commit()
+        db.refresh(db_paper)
+
+        return db_paper
+
+    finally:
+        db.close()

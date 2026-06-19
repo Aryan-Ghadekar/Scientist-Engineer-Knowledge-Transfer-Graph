@@ -1,6 +1,6 @@
 """
 dashboarddata/service.py
-Queries Supabase `profiles` and `papers` tables to build dashboard metrics.
+Queries `profiles` and `papers` tables to build dashboard metrics.
 Uses the same admin client pattern as auth/service.py.
 """
 from __future__ import annotations
@@ -8,7 +8,6 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from supabase import Client, create_client
 
 from .models import (
     ActivityFeedData,
@@ -21,13 +20,11 @@ from .models import (
     SIPOCData,
     StatCardData,
 )
+from config.postgres_db import SessionLocal
+from auth.models import User
+from Roadmap.models import Paper
 
 load_dotenv()
-
-_SUPABASE_URL         = os.environ["SUPABASE_URL"]
-_SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-
-supabase_admin: Client = create_client(_SUPABASE_URL, _SUPABASE_SERVICE_KEY)
 
 # Professions that map to "scientist/researcher" vs "engineer"
 _SCIENTIST_PROFESSIONS = {"researcher", "scientist", "academic", "phd", "postdoc"}
@@ -69,121 +66,131 @@ class DashboardService:
     # ── Stats ────────────────────────────────
 
     async def get_stats(self) -> StatCardData:
-        # Fetch all profiles
-        profiles_res = (
-            supabase_admin
-            .table("profiles")
-            .select("profession, is_active, is_verified")
-            .execute()
-        )
-        profiles: list[dict] = profiles_res.data or []
 
-        scientists = sum(
-            1 for p in profiles
-            if str(p.get("profession", "")).lower() in _SCIENTIST_PROFESSIONS
-        )
-        engineers = sum(
-            1 for p in profiles
-            if str(p.get("profession", "")).lower() in _ENGINEER_PROFESSIONS
-        )
+        db = SessionLocal()
 
-        # Fetch all papers
-        papers_res = (
-            supabase_admin
-            .table("papers")
-            .select("year, probability, confidence")
-            .execute()
-        )
-        papers: list[dict] = papers_res.data or []
+        try:
 
-        current_year = datetime.now().year
-        active_edges = len(papers)
+            profiles = db.query(User).all()
 
-        # Avg knowledge lag = avg(current_year - paper year)
-        years = [p["year"] for p in papers if p.get("year")]
-        avg_lag = round(
-            sum(current_year - y for y in years) / len(years), 1
-        ) if years else 0.0
+            scientists = sum(
+                1 for p in profiles
+                if str(p.profession).lower() in _SCIENTIST_PROFESSIONS
+            )
 
-        # Bottlenecks = papers with low probability (< 0.4)
-        bottlenecks = sum(
-            1 for p in papers
-            if p.get("probability") is not None and p["probability"] < 0.4
-        )
+            engineers = sum(
+                1 for p in profiles
+                if str(p.profession).lower() in _ENGINEER_PROFESSIONS
+            )
 
-        # Resolved transfers = papers with confidence = 'high'
-        resolved = sum(
-            1 for p in papers
-            if str(p.get("confidence", "")).lower() == "high"
-        )
+            papers = db.query(Paper).all()
 
-        return StatCardData(
-            total_scientists=scientists,
-            total_engineers=engineers,
-            active_edges=active_edges,
-            avg_knowledge_lag=avg_lag,
-            bottlenecks_detected=bottlenecks,
-            resolved_transfers=resolved,
-        )
+            current_year = datetime.now().year
+
+            active_edges = len(papers)
+
+            years = [
+                p.year
+                for p in papers
+                if p.year
+            ]
+
+            avg_lag = (
+                round(
+                    sum(current_year - y for y in years)
+                    / len(years),
+                    1
+                )
+                if years else 0
+            )
+
+            bottlenecks = sum(
+                1
+                for p in papers
+                if p.probability and p.probability < 0.4
+            )
+
+            resolved = sum(
+                1
+                for p in papers
+                if str(p.confidence).lower() == "high"
+            )
+
+            return StatCardData(
+                total_scientists=scientists,
+                total_engineers=engineers,
+                active_edges=active_edges,
+                avg_knowledge_lag=avg_lag,
+                bottlenecks_detected=bottlenecks,
+                resolved_transfers=resolved,
+            )
+
+        finally:
+            db.close()
 
     # ── SIPOC ─────────────────────────────────
 
     async def get_sipoc(self) -> SIPOCData:
-        profiles_res = (
-            supabase_admin
-            .table("profiles")
-            .select("profession")
-            .execute()
-        )
-        profiles: list[dict] = profiles_res.data or []
-        total = len(profiles) or 1
 
-        engineers = sum(
-            1 for p in profiles
-            if str(p.get("profession", "")).lower() in _ENGINEER_PROFESSIONS
-        )
+        db = SessionLocal()
 
-        papers_res = (
-            supabase_admin
-            .table("papers")
-            .select("confidence")
-            .execute()
-        )
-        papers: list[dict] = papers_res.data or []
-        total_papers = len(papers) or 1
+        try:
 
-        # Success = papers whose confidence is NOT 'low'
-        successes = sum(
-            1 for p in papers
-            if str(p.get("confidence", "")).lower() != "low"
-        )
-        transfer_rate = round((successes / total_papers) * 100, 1)
-        engineer_readiness = round((engineers / total) * 100, 1)
+            profiles = db.query(User).all()
 
-        return SIPOCData(
-            transfer_success_rate=transfer_rate,
-            engineer_readiness=engineer_readiness,
-        )
+            total = len(profiles) or 1
+
+            engineers = sum(
+                1
+                for p in profiles
+                if str(p.profession).lower() in _ENGINEER_PROFESSIONS
+            )
+
+            papers = db.query(Paper).all()
+
+            total_papers = len(papers) or 1
+
+            successes = sum(
+                1
+                for p in papers
+                if str(p.confidence).lower() != "low"
+            )
+
+            transfer_rate = round(
+                (successes / total_papers) * 100,
+                1
+            )
+
+            engineer_readiness = round(
+                (engineers / total) * 100,
+                1
+            )
+
+            return SIPOCData(
+                transfer_success_rate=transfer_rate,
+                engineer_readiness=engineer_readiness,
+            )
+
+        finally:
+            db.close()
 
     # ── Activity Feed ─────────────────────────
 
     async def get_activity(self, limit: int = 10) -> ActivityFeedData:
         """Return the most recently created/updated papers as activity items."""
-        papers_res = (
-            supabase_admin
-            .table("papers")
-            .select("title, abstract, confidence, probability, created_at")
-            .order("created_at", desc=True)
+        db = SessionLocal()
+        papers = (
+            db.query(Paper)
+            .order_by(Paper.id.desc())
             .limit(limit)
-            .execute()
+            .all()
         )
-        papers: list[dict] = papers_res.data or []
 
         items: list[ActivityItem] = []
         for p in papers:
-            conf = str(p.get("confidence", "")).lower()
-            prob = p.get("probability") or 1.0
-            title = p.get("title", "Untitled Paper")
+            conf = str(p.confidence or "").lower()
+            prob = p.probability or 1.0
+            title = p.title or "Untitled Paper"
             created = p.get("created_at", "")
             time_str = _relative_time(created)
 
@@ -222,21 +229,15 @@ class DashboardService:
 
     async def get_lag_trend(self) -> LagTrendData:
         """Group papers by year, compute avg lag per year, return last 8 buckets."""
-        papers_res = (
-            supabase_admin
-            .table("papers")
-            .select("year, created_at")
-            .order("year", desc=False)
-            .execute()
-        )
-        papers: list[dict] = papers_res.data or []
+        db = SessionLocal()
+        papers = db.query(Paper).all()
         current_year = datetime.now().year
 
         # Group lags by year
         from collections import defaultdict
         year_lags: dict[int, list[int]] = defaultdict(list)
         for p in papers:
-            y = p.get("year")
+            y = p.year
             if y:
                 year_lags[int(y)].append(current_year - int(y))
 
@@ -259,22 +260,20 @@ class DashboardService:
     # ── Resource Distribution ─────────────────
 
     async def get_resource_distribution(self) -> ResourceDistributionData:
-        profiles_res = (
-            supabase_admin
-            .table("profiles")
-            .select("profession, is_active")
-            .execute()
-        )
-        profiles: list[dict] = profiles_res.data or []
+        db = SessionLocal()
+        profiles = db.query(User).all()
         total = len(profiles) or 1
 
         scientists = sum(
-            1 for p in profiles
-            if str(p.get("profession", "")).lower() in _SCIENTIST_PROFESSIONS
+            1
+            for p in profiles
+            if str(p.profession or "").lower() in _SCIENTIST_PROFESSIONS
         )
+
         engineers = sum(
-            1 for p in profiles
-            if str(p.get("profession", "")).lower() in _ENGINEER_PROFESSIONS
+            1
+            for p in profiles
+            if str(p.profession or "").lower() in _ENGINEER_PROFESSIONS
         )
         idle = total - scientists - engineers
 

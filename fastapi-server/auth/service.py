@@ -10,9 +10,8 @@ import os
 import traceback
 
 from dotenv import load_dotenv
-from supabase import Client, create_client
 
-from .models import (
+from .schemas import (
     AuthResponse,
     LoginRequest,
     ProfileUpdate,
@@ -20,64 +19,59 @@ from .models import (
     TokenRefreshResponse,
     UserProfile,
 )
+from jose import jwt, JWTError
+
+from config.postgres_db import SessionLocal
+from .models import User
+
+from .security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    SECRET_KEY,
+    ALGORITHM,
+)
 
 load_dotenv()
-
-
-# ─────────────────────────────────────────────
-# Supabase clients
-# ─────────────────────────────────────────────
-
-_SUPABASE_URL         = os.environ["SUPABASE_URL"]
-_SUPABASE_ANON_KEY    = os.environ["SUPABASE_ANON_KEY"]
-_SUPABASE_SERVICE_KEY = os.environ["SUPABASE_SERVICE_KEY"]
-
-# Admin client — service role key, bypasses RLS, used for admin.create_user
-supabase_admin: Client = create_client(_SUPABASE_URL, _SUPABASE_SERVICE_KEY)
-
-# Anon client — used for sign_in_with_password to get a proper JWT session
-supabase_anon: Client  = create_client(_SUPABASE_URL, _SUPABASE_ANON_KEY)
-
-
 # ─────────────────────────────────────────────
 # Helper
 # ─────────────────────────────────────────────
 
-def _row_to_profile(row: dict) -> UserProfile:
+def _row_to_profile(user: User) -> UserProfile:
     return UserProfile(
-        id           = row["id"],
-        username     = row["username"],
-        full_name    = row.get("full_name"),
-        profession   = row["profession"],
-        organization = row.get("organization"),
-        department   = row.get("department"),
-        bio          = row.get("bio"),
-        avatar_url   = row.get("avatar_url"),
-        website_url  = row.get("website_url"),
-        is_verified  = row.get("is_verified", False),
-        created_at   = row["created_at"],
+        id=user.id,
+        username=user.username,
+        full_name=user.full_name,
+        profession=user.profession,
+        organization=user.organization,
+        department=user.department,
+        bio=user.bio,
+        avatar_url=user.avatar_url,
+        website_url=user.website_url,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
     )
 
-
 def _fetch_profile(user_id: str) -> UserProfile:
-    """Fetch profile row by UUID — raises ValueError if not found."""
+
+    db = SessionLocal()
+
     try:
-        result = (
-            supabase_admin
-            .table("profiles")
-            .select("*")
-            .eq("id", user_id)
-            .single()
-            .execute()
-        )
-    except Exception as exc:
-        raise ValueError(f"Profile not found (DB error: {exc})") from exc
 
-    if not result.data:
-        raise ValueError(f"Profile not found for user_id={user_id}")
+        user = db.query(User).filter(
+            User.id == user_id
+        ).first()
 
-    row = result.data if isinstance(result.data, dict) else result.data[0]
-    return _row_to_profile(row)
+        if not user:
+            raise ValueError(
+                f"User with id '{user_id}' not found."
+            )
+
+        return _row_to_profile(user)
+
+    finally:
+        db.close()
 
 
 # ─────────────────────────────────────────────
@@ -101,164 +95,216 @@ class AuthService:
         if not await self.is_username_available(data.username):
             raise ValueError("Username is already taken.")
 
+        db = SessionLocal()
         # 2. Create user via admin API — email_confirm=True skips confirmation email
         try:
-            auth_res = supabase_admin.auth.admin.create_user({
-                "email":          data.email,
-                "password":       data.password,
-                "email_confirm":  True,           # ← key: no confirmation email sent
-                "user_metadata": {
-                    "username":     data.username,
-                    "full_name":    data.full_name,
-                    "profession":   data.profession.value,
-                    "organization": data.organization or "",
-                    "department":   data.department or "",
-                },
-            })
+            db_user = User(
+                email=data.email,
+                username=data.username.lower(),
+                password_hash=hash_password(
+                    data.password
+                ),
+                full_name=data.full_name,
+                profession=data.profession.value,
+                organization=data.organization,
+                department=data.department
+            )
+
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
         except Exception as exc:
-            # Surface the real Supabase error (e.g. "User already registered")
             raise ValueError(f"Signup failed: {exc}") from exc
 
-        user = auth_res.user
+        user = db_user 
         if not user:
-            raise ValueError("Signup failed — Supabase returned no user.")
-
-
-        # 3. Sign in immediately to obtain JWT tokens
-        try:
-            session_res = supabase_anon.auth.sign_in_with_password({
-                "email":    data.email,
-                "password": data.password,
-            })
-        except Exception as exc:
-            raise ValueError(
-                "Account created but auto-login failed. Please log in manually."
-            ) from exc
-
-        if session_res.session is None or session_res.user is None:
-            raise ValueError("Account created but auto-login failed. Please log in manually.")
-
+            raise ValueError("Signup failed — returned no user.")
+        
         # 4. Fetch the auto-created profile (created by DB trigger)
         profile = _fetch_profile(user.id)
 
-
         return AuthResponse(
-            access_token  = session_res.session.access_token,
-            refresh_token = session_res.session.refresh_token,
-            user          = profile,
+            access_token=create_access_token(user.id),
+            refresh_token=create_refresh_token(user.id),
+            user=profile,
         )
 
     # ── Sign-in ──────────────────────────────
 
     async def sign_in(self, data: LoginRequest) -> AuthResponse:
+        db = SessionLocal()
         try:
-            resp = supabase_anon.auth.sign_in_with_password({
-                "email":    data.email,
-                "password": data.password,
-            })
+            user = db.query(User).filter(
+                User.email == data.email
+            ).first()
+
+            if not user:
+                raise ValueError(
+                    "Invalid email or password"
+                )
+
+            if not verify_password(
+                data.password,
+                user.password_hash
+            ):
+                raise ValueError(
+                    "Invalid email or password"
+                )
         except Exception as exc:
             raise ValueError("Invalid email or password.") from exc
 
-        if resp.user is None or resp.session is None:
+        if user is None:
             raise ValueError("Invalid email or password.")
 
-        profile = _fetch_profile(resp.user.id)
+        profile = _fetch_profile(user.id)
 
         return AuthResponse(
-            access_token  = resp.session.access_token,
-            refresh_token = resp.session.refresh_token,
+            access_token  = create_access_token(user.id),
+            refresh_token = create_refresh_token(user.id),
             user          = profile,
         )
 
     # ── Sign-out ─────────────────────────────
 
     async def sign_out(self) -> None:
-        try:
-            supabase_anon.auth.sign_out()
-        except Exception as exc:
-            pass
+        return None
 
     # ── Token verification ────────────────────
 
     async def verify_token(self, token: str) -> dict:
         try:
-            resp = supabase_admin.auth.get_user(token)
+            payload = jwt.decode(
+                token,
+                SECRET_KEY,
+                algorithms=[ALGORITHM]
+            )
+
+            user_id = payload["sub"]
+
+            return {
+                "user_id": user_id
+            }
         except Exception as exc:
             raise ValueError("Token is invalid or expired.") from exc
-
-        if resp.user is None:
-            raise ValueError("Token is invalid or expired.")
-
-        return {"user_id": resp.user.id, "email": resp.user.email}
 
     # ── Token refresh ─────────────────────────
 
     async def refresh_tokens(self, refresh_token: str) -> TokenRefreshResponse:
-        try:
-            resp = supabase_anon.auth.refresh_session(refresh_token)
-        except Exception as exc:
-            raise ValueError("Refresh token is invalid or expired.") from exc
+        payload = jwt.decode(
+            refresh_token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
 
-        if resp.session is None:
-            raise ValueError("Refresh token is invalid or expired.")
+        user_id = payload["sub"]
 
         return TokenRefreshResponse(
-            access_token  = resp.session.access_token,
-            refresh_token = resp.session.refresh_token,
+            access_token=create_access_token(user_id),
+            refresh_token=create_refresh_token(user_id)
         )
 
     # ── Profile CRUD ──────────────────────────
 
-    async def get_profile_by_id(self, user_id: str) -> UserProfile:
-        return _fetch_profile(user_id)
+    async def get_profile_by_id(
+        self,
+        user_id: str
+    ) -> UserProfile:
 
-    async def get_profile_by_username(self, username: str) -> UserProfile:
+        db = SessionLocal()
+
         try:
-            result = (
-                supabase_admin
-                .table("profiles")
-                .select("*")
-                .eq("username", username.lower())
-                .single()
-                .execute()
+            user = db.query(User).filter(
+                User.id == user_id
+            ).first()
+
+            if not user:
+                raise ValueError(
+                    f"User with id '{user_id}' not found."
+                )
+
+            return _row_to_profile(user)
+
+        finally:
+            db.close()
+
+    async def get_profile_by_username(
+        self,
+        username: str
+    ) -> UserProfile:
+
+        db = SessionLocal()
+
+        try:
+            user = db.query(User).filter(
+                User.username == username.lower()
+            ).first()
+
+            if not user:
+                raise ValueError(
+                    f"User '{username}' not found."
+                )
+
+            return _row_to_profile(user)
+
+        finally:
+            db.close()
+
+    async def update_profile(
+        self,
+        user_id: str,
+        data: ProfileUpdate
+    ) -> UserProfile:
+
+        db = SessionLocal()
+
+        try:
+
+            user = db.query(User).filter(
+                User.id == user_id
+            ).first()
+
+            if not user:
+                raise ValueError(
+                    "User not found."
+                )
+
+            payload = data.model_dump(
+                exclude_unset=True
             )
-        except Exception as exc:
-            raise ValueError(f"User '{username}' not found.") from exc
 
-        if not result.data:
-            raise ValueError(f"User '{username}' not found.")
+            if not payload:
+                return _row_to_profile(user)
 
-        row = result.data if isinstance(result.data, dict) else result.data[0]
-        return _row_to_profile(row)
+            for key, value in payload.items():
+                setattr(user, key, value)
 
-    async def update_profile(self, user_id: str, data: ProfileUpdate) -> UserProfile:
-        payload = {k: v for k, v in data.model_dump().items() if v is not None}
-        if not payload:
-            return _fetch_profile(user_id)
+            db.commit()
+            db.refresh(user)
 
-        try:
-            supabase_admin.table("profiles").update(payload).eq("id", user_id).execute()
-        except Exception as exc:
-            raise ValueError(f"Profile update failed: {exc}") from exc
+            return _row_to_profile(user)
 
-        return _fetch_profile(user_id)
+        finally:
+            db.close()
 
     # ── Username availability ─────────────────
 
-    async def is_username_available(self, username: str) -> bool:
+    async def is_username_available(
+        self,
+        username: str
+    ) -> bool:
+
+        db = SessionLocal()
+
         try:
-            result = (
-                supabase_admin
-                .table("profiles")
-                .select("username")
-                .eq("username", username.lower())
-                .limit(1)
-                .execute()
-            )
-            available = len(result.data) == 0
-            return available
-        except Exception as exc:
-            return False
+
+            existing_user = db.query(User).filter(
+                User.username == username.lower()
+            ).first()
+
+            return existing_user is None
+
+        finally:
+            db.close()
 
 
 auth_service = AuthService()

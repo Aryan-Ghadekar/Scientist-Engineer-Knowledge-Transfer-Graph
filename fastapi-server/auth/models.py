@@ -1,153 +1,52 @@
-"""
-auth/models.py
-Pydantic models for request validation, response serialization,
-and DB representation. Keep all auth-related schemas here.
-"""
-from __future__ import annotations
+from sqlalchemy import (
+    Column,
+    String,
+    Boolean,
+    DateTime,
+    Text,
+    Enum
+)
+from sqlalchemy.sql import func
+import uuid
 
-import re
-from datetime import datetime
-from enum import Enum
-from typing import Optional
+from config.postgres_db import Base
 
-from pydantic import BaseModel, EmailStr, field_validator, Field, model_validator
+class User(Base):
+    __tablename__ = "users"
 
+    id = Column(
+        String,
+        primary_key=True,
+        default=lambda: str(uuid.uuid4())
+    )
 
-# ─────────────────────────────────────────────
-# ENUMS
-# ─────────────────────────────────────────────
+    email = Column(String, unique=True, nullable=False)
+    username = Column(String, unique=True, nullable=False)
 
-class ProfessionType(str, Enum):
-    engineer   = "engineer"
-    scientist  = "scientist"
-    researcher = "researcher"
-    student    = "student"
-    professor  = "professor"
-    other      = "other"
+    password_hash = Column(String, nullable=False)
 
+    full_name = Column(String)
 
-# ─────────────────────────────────────────────
-# REQUEST MODELS
-# ─────────────────────────────────────────────
+    profession = Column(String)
 
-class SignupRequest(BaseModel):
-    email:        EmailStr
-    password:     str        = Field(..., min_length=8, max_length=128)
-    username:     str        = Field(..., min_length=3, max_length=50)
-    full_name:    str        = Field(..., min_length=2, max_length=150)
-    profession:   ProfessionType
-    organization: Optional[str] = Field(None, max_length=250)
-    department:   Optional[str] = Field(None, max_length=250)
+    organization = Column(String)
 
-    @field_validator("username")          # Pydantic V2: field_validator replaces validator
-    @classmethod
-    def validate_username(cls, v: str) -> str:
-        if not re.match(r"^[a-zA-Z0-9_]+$", v):
-            raise ValueError("Username may only contain letters, numbers, and underscores.")
-        return v.lower()
+    department = Column(String)
 
-    @field_validator("password")
-    @classmethod
-    def validate_password(cls, v: str) -> str:
-        if not re.search(r"[A-Z]", v):
-            raise ValueError("Password must contain at least one uppercase letter.")
-        if not re.search(r"[0-9]", v):
-            raise ValueError("Password must contain at least one digit.")
-        return v
+    bio = Column(Text)
 
-    model_config = {                      # Pydantic V2: model_config dict replaces class Config
-        "json_schema_extra": {            # renamed from schema_extra
-            "example": {
-                "email": "ada@university.edu",
-                "password": "Secure123",
-                "username": "ada_research",
-                "full_name": "Ada Lovelace",
-                "profession": "researcher",
-                "organization": "MIT CSAIL",
-                "department": "Machine Learning",
-            }
-        }
-    }
+    avatar_url = Column(String)
+
+    website_url = Column(String)
+
+    is_verified = Column(
+        Boolean,
+        default=False
+    )
+
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now()
+    )
 
 
-class LoginRequest(BaseModel):
-    email:    EmailStr
-    password: str
-
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "email": "ada@university.edu",
-                "password": "Secure123",
-            }
-        }
-    }
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class CheckUsernameRequest(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
-
-
-# ─────────────────────────────────────────────
-# PROFILE UPDATE
-# ─────────────────────────────────────────────
-
-class ProfileUpdate(BaseModel):
-    """All fields optional — patch semantics (PATCH /auth/me)."""
-    full_name:    Optional[str]            = Field(None, max_length=150)
-    profession:   Optional[ProfessionType] = None
-    organization: Optional[str]            = Field(None, max_length=250)
-    department:   Optional[str]            = Field(None, max_length=250)
-    bio:          Optional[str]            = Field(None, max_length=1000)
-    avatar_url:   Optional[str]            = None
-    website_url:  Optional[str]            = None
-
-
-# ─────────────────────────────────────────────
-# RESPONSE MODELS
-# ─────────────────────────────────────────────
-
-class UserProfile(BaseModel):
-    """Serialized profile returned to the client. Never expose sensitive fields."""
-    id:           str
-    username:     str
-    full_name:    Optional[str]
-    profession:   ProfessionType
-    organization: Optional[str]
-    department:   Optional[str]
-    bio:          Optional[str]
-    avatar_url:   Optional[str]
-    website_url:  Optional[str]
-    is_verified:  bool
-    created_at:   datetime
-
-    model_config = {
-        "from_attributes": True           # Pydantic V2: renamed from orm_mode
-    }
-
-
-class AuthResponse(BaseModel):
-    access_token:  str
-    refresh_token: str
-    token_type:    str        = "bearer"
-    user:          UserProfile
-
-
-class TokenRefreshResponse(BaseModel):
-    access_token:  str
-    refresh_token: str
-    token_type:    str = "bearer"
-
-
-class UsernameCheckResponse(BaseModel):
-    username:  str
-    available: bool
-
-
-class MessageResponse(BaseModel):
-    message: str
-    success: bool = True

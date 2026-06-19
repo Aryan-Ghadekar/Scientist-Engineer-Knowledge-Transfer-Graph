@@ -13,6 +13,8 @@ from PatentAPI.service import lifespan
 from Roadmap.routes import roadmap_router
 from dashboarddata.routes import router as dashstats_router
 from paper_review import router as paper_review_router
+from config.postgres_db import engine
+from auth.models import Base
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(gap_router, prefix='/api')
@@ -26,6 +28,8 @@ app.include_router(patent_router)
 app.include_router(roadmap_router)
 app.include_router(dashstats_router)
 app.include_router(paper_review_router)
+
+Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 async def health():

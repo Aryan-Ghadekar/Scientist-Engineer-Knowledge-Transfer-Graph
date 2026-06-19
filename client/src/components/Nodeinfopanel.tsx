@@ -205,7 +205,7 @@ const { randomPatentImage, patentNo } = useMemo(() => {
       )}
 
       {/* Investigate button */}
-      <button
+      {/* <button
         onClick={() => onInvestigate(node)}
         style={{
           marginTop:     14,
@@ -222,7 +222,7 @@ const { randomPatentImage, patentNo } = useMemo(() => {
         }}
       >
         🔍 INVESTIGATE NODE
-      </button>
+      </button> */}
 
       <div style={{ marginTop: 8, textAlign: "center", fontSize: 9, color: "rgba(255,255,255,0.18)", letterSpacing: "0.08em" }}>
         OR DOUBLE-CLICK NODE

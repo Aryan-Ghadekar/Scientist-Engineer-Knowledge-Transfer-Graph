@@ -427,7 +427,7 @@ const PaperReviewPage: React.FC = () => {
                         {data?.peer_review?.scores &&
                             Object.entries(
                                 data.peer_review.scores
-                            ).map(([k, v]) => (
+                            )?.map(([k, v]) => (
                                 <ScoreCard
                                     key={k}
                                     label={k}
@@ -449,7 +449,7 @@ const PaperReviewPage: React.FC = () => {
                                 </h3>
 
                                 <ul className="space-y-2">
-                                    {data.peer_review.strengths.map(
+                                    {data?.peer_review.strengths?.map(
                                         (s: string, i: number) => (
                                             <li key={i}>
                                                 • {s}
@@ -467,7 +467,7 @@ const PaperReviewPage: React.FC = () => {
                                 </h3>
 
                                 <ul className="space-y-2">
-                                    {data.peer_review.weaknesses.map(
+                                    {data.peer_review.weaknesses?.map(
                                         (s: string, i: number) => (
                                             <li key={i}>
                                                 • {s}

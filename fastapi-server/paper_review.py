@@ -13,16 +13,19 @@ Requirements (add to requirements.txt):
     pymupdf
     pillow
     python-dotenv   # optional
-
-Set env var:  OPENAI_API_KEY=sk-...
 """
 
+import re
+import json
 import io
 import os
 import json
 import base64
 from PIL import Image
 import fitz  # PyMuPDF
+
+# importing ai client
+from services.ai_service import AIClient
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
@@ -33,14 +36,8 @@ router = APIRouter(prefix="/paper-review", tags=["Paper Review"])
 
 
 # ── OpenAI client ──────────────────────────────────────────────────────────────
-def get_openai_client() -> OpenAI:
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="OPENAI_API_KEY environment variable is not set.",
-        )
-    return OpenAI(api_key=api_key)
+def get_ai_client():
+    return AIClient()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -182,6 +179,7 @@ Respond ONLY with valid JSON matching the schema in the system prompt."""
 #  PDF EXTRACTION HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     """Extract full text from all pages using PyMuPDF."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -224,12 +222,14 @@ def extract_images_from_pdf(pdf_bytes: bytes, max_images: int = 8) -> list[dict]
                 buf = io.BytesIO()
                 pil_img.save(buf, format="PNG")
                 b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-                extracted.append({
-                    "page": page_num + 1,
-                    "index": img_index,
-                    "base64": b64,
-                    "mime": "image/png",
-                })
+                extracted.append(
+                    {
+                        "page": page_num + 1,
+                        "index": img_index,
+                        "base64": b64,
+                        "mime": "image/png",
+                    }
+                )
             except Exception:
                 continue
     doc.close()
@@ -274,48 +274,58 @@ def get_pdf_metadata(pdf_bytes: bytes) -> dict:
 #  GPT CALL HELPERS
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def build_vision_content(prompt_text: str, images: list[dict]) -> list:
     """Build content array with text + images for GPT-4o vision."""
     content = [{"type": "text", "text": prompt_text}]
     for img in images[:12]:  # GPT-4o supports up to ~20 images
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:{img['mime']};base64,{img['base64']}",
-                "detail": "low",  # switch to "high" for richer analysis
-            },
-        })
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{img['mime']};base64,{img['base64']}",
+                    "detail": "low",  # switch to "high" for richer analysis
+                },
+            }
+        )
     return content
 
 
-def call_gpt(client: OpenAI, system: str, content: list, max_tokens: int = 3000) -> dict:
-    """Make a GPT-4o call and safely parse JSON response."""
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": content},
-        ],
+def call_gpt(client, system, content, max_tokens=3000):
+
+    response = client.chat_completion(
+        system=system,
+        content=content,
         max_tokens=max_tokens,
         temperature=0.2,
-        response_format={"type": "json_object"},
     )
-    raw = response.choices[0].message.content
-    usage = {
-        "prompt_tokens": response.usage.prompt_tokens,
-        "completion_tokens": response.usage.completion_tokens,
-        "total_tokens": response.usage.total_tokens,
-    }
+
+    raw = response.choices[0].message.content.strip()
+
+
+    # Remove any markdown code fences
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    raw = raw.strip()
+
     try:
         parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        parsed = {"raw_response": raw, "parse_error": "JSON decode failed"}
+    except json.JSONDecodeError as e:
+        parsed = {"raw_response": raw, "parse_error": str(e)}
+
+    usage = {
+        "prompt_tokens": getattr(response.usage, "prompt_tokens", 0),
+        "completion_tokens": getattr(response.usage, "completion_tokens", 0),
+        "total_tokens": getattr(response.usage, "total_tokens", 0),
+    }
+
     return parsed, usage
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  ROUTES
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 @router.post(
     "/review",
@@ -330,9 +340,15 @@ def call_gpt(client: OpenAI, system: str, content: list, max_tokens: int = 3000)
 )
 async def review_paper(
     file: UploadFile = File(..., description="Research paper PDF"),
-    include_images: bool = Form(True, description="Extract and analyze embedded figures"),
-    render_first_pages: bool = Form(True, description="Rasterize first 2 pages for visual analysis"),
-    run_plagiarism_check: bool = Form(True, description="Run plagiarism signal detection"),
+    include_images: bool = Form(
+        True, description="Extract and analyze embedded figures"
+    ),
+    render_first_pages: bool = Form(
+        True, description="Rasterize first 2 pages for visual analysis"
+    ),
+    run_plagiarism_check: bool = Form(
+        True, description="Run plagiarism signal detection"
+    ),
 ):
     # ── Validate ─────────────────────────────────────────────────────────
     if not file.filename.lower().endswith(".pdf"):
@@ -379,19 +395,20 @@ async def review_paper(
     image_note = (
         f"I have also provided {len(all_images)} image(s) from the paper "
         "(rendered pages and/or extracted figures). Factor them into your review."
-        if all_images else ""
+        if all_images
+        else ""
     )
 
     review_prompt = REVIEW_USER_TEMPLATE.format(text=text, image_note=image_note)
     plagiarism_prompt = PLAGIARISM_USER_TEMPLATE.format(text=text)
 
     # ── Call GPT ─────────────────────────────────────────────────────────
-    client = get_openai_client()
+    client = get_ai_client()
     total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     # 1. Peer review (with images)
     try:
-        review_content = build_vision_content(review_prompt, all_images)
+        review_content = review_prompt
         review_data, review_usage = call_gpt(
             client, REVIEW_SYSTEM_PROMPT, review_content, max_tokens=3000
         )
@@ -404,7 +421,7 @@ async def review_paper(
     plagiarism_data = None
     if run_plagiarism_check:
         try:
-            plag_content = [{"type": "text", "text": plagiarism_prompt}]
+            plag_content = plagiarism_prompt
             plagiarism_data, plag_usage = call_gpt(
                 client, PLAGIARISM_SYSTEM_PROMPT, plag_content, max_tokens=2500
             )
@@ -477,11 +494,10 @@ async def plagiarism_only(
         raise HTTPException(status_code=422, detail="Could not extract readable text.")
 
     metadata = get_pdf_metadata(pdf_bytes)
-    client = get_openai_client()
-
-    prompt = PLAGIARISM_USER_TEMPLATE.format(text=text)
+    plagiarism_prompt = PLAGIARISM_USER_TEMPLATE.format(text=text)
+    client = get_ai_client()
     try:
-        plag_content = [{"type": "text", "text": prompt}]
+        plag_content = plagiarism_prompt
         plagiarism_data, usage = call_gpt(
             client, PLAGIARISM_SYSTEM_PROMPT, plag_content, max_tokens=2500
         )

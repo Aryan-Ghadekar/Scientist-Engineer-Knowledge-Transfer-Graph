@@ -3,6 +3,7 @@ from services.ai_service import client
 import re
 from config.postgres_db import SessionLocal
 from .models import Paper
+from services.ai_service import client
 
 
 def get_graph_context(title):
@@ -70,10 +71,10 @@ CONTEXT:
 """
 
     def call_llm():
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
+        response = client.chat_completion(
+            system="You are a senior AI product engineer.",
+            content=prompt,
+            temperature=0.3
         )
         return response.choices[0].message.content
 

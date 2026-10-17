@@ -1,22 +1,10 @@
-import os
-import re
 import time
 import logging
-from contextlib import asynccontextmanager
-from functools import lru_cache
-from typing import Optional
 
-import numpy as np
-import pandas as pd
-import joblib
+from fastapi import HTTPException, APIRouter
 
-from fastapi import FastAPI, HTTPException, Request, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, field_validator
-# from .service import _run_inference
 from .models import PaperInput, PredictionResponse, TextOnlyInput, BatchInput, BatchResponse
-from .HuggingFace.patent_model_client import predict_patent,get_client
+from .HuggingFace.patent_model_client import predict_patent, get_client
 
 patent_router = APIRouter(prefix="/api/model_predict", tags=["Model"])
 
@@ -27,51 +15,6 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("patent_api")
-
-# # ── Artefact paths (override via env vars for Docker / cloud deploy) ─────────
-# MODEL_PATH  = os.getenv("MODEL_PATH",  "outputs/patent_predictor_v4.pkl")
-# SCALER_PATH = os.getenv("SCALER_PATH", "outputs/patent_scaler_v4.pkl")
-# TFIDF_PATH  = os.getenv("TFIDF_PATH",  "outputs/patent_tfidf_v4.pkl")
-# SVD_PATH    = os.getenv("SVD_PATH",    "outputs/patent_svd_v4.pkl")
-# META_PATH   = os.getenv("META_PATH",   "outputs/patent_meta_v4.pkl")
-
-# # ── Global artefact store ────────────────────────────────────────────────────
-# ARTS: dict = {}
-
-# ══════════════════════════════════════════════════════════════
-# STARTUP / SHUTDOWN
-# ══════════════════════════════════════════════════════════════
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """Load model artefacts once at startup; release on shutdown."""
-#     log.info("Loading model artefacts ...")
-#     for path in [MODEL_PATH, SCALER_PATH, TFIDF_PATH, SVD_PATH, META_PATH]:
-#         if not os.path.exists(path):
-#             raise RuntimeError(
-#                 f"Artefact not found: {path}\n"
-#                 "Run  python patent_predictor_v4.py  first to train and save the model."
-#             )
-#     ARTS["model"]  = joblib.load(MODEL_PATH)
-#     ARTS["scaler"] = joblib.load(SCALER_PATH)
-#     ARTS["tfidf"]  = joblib.load(TFIDF_PATH)
-#     ARTS["svd"]    = joblib.load(SVD_PATH)
-#     ARTS["meta"]   = joblib.load(META_PATH)
-#     ARTS["meta"]["threshold"] = 0.6
-#     log.info("✓ Model artefacts loaded successfully.")
-#     yield
-#     ARTS.clear()
-#     log.info("Artefacts released.")
-# ══════════════════════════════════════════════════════════════
-# MIDDLEWARE — request timing
-# ══════════════════════════════════════════════════════════════
-# @patent_router.middleware("http")
-# async def add_latency_header(request: Request, call_next):
-#     start = time.perf_counter()
-#     response = await call_next(request)
-#     ms = (time.perf_counter() - start) * 1000
-#     response.headers["X-Latency-Ms"] = f"{ms:.1f}"
-#     return response
-
 
 # ══════════════════════════════════════════════════════════════
 # ENDPOINTS
@@ -92,29 +35,6 @@ def model_info():
         "model": "patent_predictor_v4",
         "provider": "huggingface_space",
     }
-# @patent_router.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
-# def predict(paper: PaperInput):
-#     """
-#     Full prediction — accepts all structured metadata alongside text.
-
-#     Provide as much of title, abstract, and keywords as possible for
-#     best accuracy. Structured fields (year, cited, novelty, etc.) are
-#     optional but improve predictions when available.
-#     """
-#     if not paper.title and not paper.abstract and not paper.keywords:
-#         raise HTTPException(
-#             status_code=422,
-#             detail="Provide at least one of: title, abstract, keywords."
-#         )
-#     t0     = time.perf_counter()
-#     result = _run_inference(paper)
-#     result["latency_ms"] = round((time.perf_counter() - t0) * 1000, 2)
-#     log.info(
-#         f"/predict  prob={result['probability']:.3f}  "
-#         f"conf={result['confidence']}  {result['latency_ms']}ms"
-#     )
-#     return result
-
 
 
 @patent_router.post(
